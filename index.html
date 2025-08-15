@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vocal Pattern Trainer — Piano</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+           background: radial-gradient(1200px 600px at 20% -10%, #0b1325 0%, #0a0f1a 45%, #080d16 100%);
+           color: #e5e7eb; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .card { background: rgba(15, 23, 42, 0.8); border: 1px solid #1f2937; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 980px){ .row { grid-template-columns: 1fr 1fr; } }
+    .label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; display:block;}
+    select, input[type=number], input[type=text] {
+      width: 100%; background: #0f172a; color: #e5e7eb; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; outline: none;
+    }
+    input[type=range] { width: 100%; }
+    .btn { border-radius: 12px; padding: 10px 14px; font-weight: 700; border: 0; cursor: pointer; }
+    .btn-play { background: #22c55e; color: #0b1220; }
+    .btn-stop { background: #ef4444; color: #0b1220; }
+    .btn-ghost { background:#0f172a; border:1px solid #334155; color:#e5e7eb; }
+    .muted { opacity: .75; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .gridline { stroke: #334155; stroke-dasharray: 4 6; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border:1px solid #334155; background:#0f172a; }
+    .inline { display:inline-flex; align-items:center; gap:8px; }
+    .row-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .seg { display:flex; border:1px solid #334155; border-radius:12px; overflow:hidden; }
+    .seg button { flex:1; background:#0f172a; color:#e5e7eb; padding:8px 10px; border:0; cursor:pointer; }
+    .seg button.active { background:#1f2937; }
+    .small { font-size: 12px; }
+    .controls { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .controls > div:nth-child(1) { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <h1 style="font-weight:800; letter-spacing:-0.02em">Vocal Pattern Trainer — Piano</h1>
+      <div class="inline">
+        <span class="badge">Tone.js</span>
+        <span class="badge">Sampler Piano</span>
+        <span class="badge">Breath Pauses</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <label class="label">Упражнение</label>
+        <select id="patternSelect"></select>
+        <p id="patternDesc" class="muted" style="margin-top:8px"></p>
+        <p class="muted" style="margin-top:4px">Режим паттерна: <span id="patternMode" class="badge"></span></p>
+      </div>
+
+      <div class="card controls">
+        <div>
+          <label class="label">Стартовая нота</label>
+          <div class="row-3">
+            <select id="startNote" style="grid-column: 1 / span 2;"></select>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-ghost" id="nudgeDown">–1</button>
+              <button class="btn-ghost" id="nudgeUp">+1</button>
+              <button class="btn-ghost" id="testStart">Тест</button>
+            </div>
+          </div>
+          <div class="muted small" id="startInfo"></div>
+        </div>
+        <div>
+          <label class="label">Транспонирование (полутонов)</label>
+          <input type="range" id="transpose" min="-12" max="12" value="0" />
+          <div class="muted small" id="transposeVal">+0</div>
+        </div>
+        <div>
+          <label class="label">Направление</label>
+          <div class="seg">
+            <button id="dirUp" class="active">Вверх/вперёд</button>
+            <button id="dirDown">Вниз/назад</button>
+          </div>
+          <div class="muted small" id="dirVal" style="margin-top:6px;">up</div>
+        </div>
+        <div>
+          <label class="label">Темп (BPM)</label>
+          <input type="number" id="bpm" min="30" max="240" value="90" />
+        </div>
+        <div>
+          <label class="label">Повторов с шагом</label>
+          <input type="number" id="repeatSteps" min="0" max="48" value="0" />
+          <div class="muted small">Сколько раз повторить, транспонируя каждый раз.</div>
+        </div>
+        <div>
+          <label class="label">Шаг транспозиции (полутонов)</label>
+          <input type="number" id="stepSemis" min="-12" max="12" value="1" />
+        </div>
+        <div>
+          <label class="label">Пауза на вдох между повторами</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="number" id="breathMs" min="0" max="8000" value="800" />
+            <span class="muted small">мс</span>
+          </div>
+        </div>
+        <div>
+          <label class="label">Длительность ноты</label>
+          <select id="noteDur">
+            <option value="16n">1/16</option>
+            <option value="8n" selected>1/8</option>
+            <option value="4n">1/4</option>
+            <option value="2n">1/2</option>
+            <option value="1n">1</option>
+            <option value="1n*2">2 (double whole)</option>
+            <option value="1n*4">4 (longa)</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Прелюдия (cue перед каждым повтором)</label>
+          <select id="cueMode">
+            <option value="none">Нет</option>
+            <option value="chord" selected>Аккорд I (трезвучие)</option>
+            <option value="arp">Арпеджио 1–3–5–1</option>
+            <option value="scale">Мажорная 1–2–3–4–5–4–3–2–1</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Звук: Пианино</label>
+          <div class="muted small" id="soundStatus">Готово</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+        <div class="muted">Паттерн: <span id="degreeList"></span></div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-play" id="btnPlay">▶️ Проиграть</button>
+          <button class="btn btn-stop" id="btnStop" disabled>⏹ Остановить</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-bottom:8px;">Ноты: <span class="mono" id="noteList"></span></div>
+      <div style="overflow-x:auto; border-radius:12px; border:1px solid #1f2937;">
+        <svg id="svg" width="800" height="240" viewBox="0 0 800 240"></svg>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+  <script>
+    const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const NAME_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n,i)=>[n,i]));
+    function codepoints(s){ return Array.from(s).map(ch=>ch.codePointAt(0)); }
+    function noteToMidiSafe(note){
+      const raw = String(note);
+      const s = raw.trim().replace(/♯/g, "#").replace(/♭/g, "b");
+      const m = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(s);
+      if(!m){ console.warn("PARSE_FAIL", {raw, s, codes: codepoints(raw)}); return 60; }
+      let name = m[1].toUpperCase(); let acc = m[2]; const oct = parseInt(m[3],10);
+      const flats = { "Cb":"B", "Db":"C#", "Eb":"D#", "Fb":"E", "Gb":"F#", "Ab":"G#", "Bb":"A#" };
+      if(acc === "b"){ name = flats[name+"b"] || (name+"b"); } else if(acc==="#"){ name = name+"#"; }
+      const idx = NAME_TO_SEMITONE[name]; if(idx===undefined){ console.warn("SEMITONE_FAIL", {name, raw}); return 60; }
+      return idx + (oct + 1) * 12;
+    }
+    function midiToNote(m){ const name = NOTE_NAMES[((m%12)+12)%12]; const oct = Math.floor(m/12) - 1; return name + oct; }
+    function durToSeconds(s){ if(String(s).includes("*")){ const [b,k]=String(s).split("*"); return Tone.Time(b).toSeconds()*parseFloat(k); } return Tone.Time(s).toSeconds(); }
+    const MAJOR_STEPS = [0,2,4,5,7,9,11];
+    const degMajor = (n) => MAJOR_STEPS[((n-1)%7+7)%7] + 12*Math.floor((n-1)/7);
+
+    const PATTERNS = [
+      { id:"deg_arp", name:"Арпеджио 1–3–5–8–5–3–1", type:"degree", data:[1,3,5,8,5,3,1], desc:"Диатоника" },
+      { id:"deg_1p5", name:"1–3–5–1–3–5–4–3–2–1 (~1.5)", type:"degree", data:[1,3,5,8,10,12,11,10,9,8].map(d=>d-7), desc:"Диатоника" },
+      { id:"sem_canonical_1p5", name:"Каноничное 1.5 (семитоны)", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"Хроматика" },
+    ];
+
+    const CUE = {
+      none: () => [],
+      chord: (rootMidi) => [{notes:[0,4,7].map(s=>rootMidi+s), dur:"4n"}],
+      arp: (rootMidi) => [0,4,7,12].map(s => ({notes:[rootMidi+s], dur:"8n"})),
+      scale: (rootMidi) => [1,2,3,4,5,4,3,2,1].map(d=>({notes:[rootMidi+degMajor(d)], dur:"8n"})),
+    };
+
+    const els = {
+      patternSelect: document.getElementById("patternSelect"),
+      patternDesc: document.getElementById("patternDesc"),
+      patternMode: document.getElementById("patternMode"),
+      startNote: document.getElementById("startNote"),
+      startInfo: document.getElementById("startInfo"),
+      transpose: document.getElementById("transpose"),
+      transposeVal: document.getElementById("transposeVal"),
+      dirUp: document.getElementById("dirUp"),
+      dirDown: document.getElementById("dirDown"),
+      dirVal: document.getElementById("dirVal"),
+      bpm: document.getElementById("bpm"),
+      repeatSteps: document.getElementById("repeatSteps"),
+      stepSemis: document.getElementById("stepSemis"),
+      breathMs: document.getElementById("breathMs"),
+      noteDur: document.getElementById("noteDur"),
+      cueMode: document.getElementById("cueMode"),
+      soundStatus: document.getElementById("soundStatus"),
+      degreeList: document.getElementById("degreeList"),
+      noteList: document.getElementById("noteList"),
+      svg: document.getElementById("svg"),
+      btnPlay: document.getElementById("btnPlay"),
+      btnStop: document.getElementById("btnStop"),
+      nudgeUp: document.getElementById("nudgeUp"),
+      nudgeDown: document.getElementById("nudgeDown"),
+      testStart: document.getElementById("testStart"),
+    };
+    let dir = "up";
+
+    function fillNotes(){
+      const items = [];
+      for(let o=2;o<=6;o++){ for(const n of NOTE_NAMES){ items.push(`${n}${o}`);} }
+      for(const n of items){
+        const opt = document.createElement("option");
+        opt.value=n; opt.textContent=n; els.startNote.appendChild(opt);
+      }
+      els.startNote.value = "A2";
+      updateStartInfo();
+    }
+    function fillPatterns(){
+      for(const p of PATTERNS){
+        const opt = document.createElement("option");
+        opt.value = p.id; opt.textContent = p.name;
+        els.patternSelect.appendChild(opt);
+      }
+      els.patternSelect.value = PATTERNS[2].id;
+      updatePatternMeta();
+    }
+    fillNotes(); fillPatterns();
+
+    function updateStartInfo(){
+      const base = noteToMidiSafe(els.startNote.value);
+      const trans = parseInt(els.transpose.value||"0",10);
+      const midi = base + trans;
+      els.startInfo.textContent = `MIDI=${midi} (${midiToNote(midi)})`;
+    }
+    function updatePatternMeta(){
+      const p = PATTERNS.find(x=>x.id===els.patternSelect.value);
+      els.patternDesc.textContent = p.desc;
+      els.patternMode.textContent = p.type === "semitone" ? "Semitone offsets" : "Diatonic degrees";
+      let label = "";
+      if(p.type === "degree"){ label = p.data.map(d => d>7 ? (((d-1)%7)+1)+"↑" : d).join(" – "); }
+      else { label = p.data.map(s => (s>=0?`+${s}`:`${s}`)).join("  "); }
+      els.degreeList.textContent = label;
+    }
+
+    function buildPatternSeq(startMidi, pattern){
+      const rel = (pattern.type === "degree") ? pattern.data.map(d => degMajor(d)) : pattern.data.slice();
+      return rel.map(off => startMidi + off);
+    }
+    function computeAll(){
+      const pattern = PATTERNS.find(p=>p.id===els.patternSelect.value);
+      const startMidi = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
+      const repeatSteps = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value||"0",10)));
+      const stepSemis = parseInt(els.stepSemis.value||"0",10);
+
+      const blocks = [];
+      for(let i=0;i<=repeatSteps;i++){
+        const base = startMidi + i*stepSemis;
+        const seq = buildPatternSeq(base, pattern);
+        blocks.push(dir==="down" ? seq.slice().reverse() : seq);
+      }
+      const flatSeq = blocks.flat();
+      drawGraph(flatSeq);
+      els.noteList.textContent = flatSeq.map(m => midiToNote(m)).join("  ·  ");
+      return { blocks, flatSeq, pattern, startMidi, stepSemis };
+    }
+
+    function drawGraph(seq){
+      const width = Math.max(600, seq.length * 20);
+      const height = 240;
+      els.svg.setAttribute("width", width);
+      els.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      els.svg.innerHTML = "";
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect"); bg.setAttribute("x","0"); bg.setAttribute("y","0"); bg.setAttribute("width", width); bg.setAttribute("height", height); bg.setAttribute("fill", "#0f172a"); els.svg.appendChild(bg);
+      for(let i=1;i<=7;i++){ const line = document.createElementNS("http://www.w3.org/2000/svg", "line"); line.setAttribute("x1","0"); line.setAttribute("x2", String(width)); line.setAttribute("y1", String(i*30)); line.setAttribute("y2", String(i*30)); line.setAttribute("class","gridline"); els.svg.appendChild(line); }
+      if(!seq.length) return;
+      const minY = Math.min(...seq), maxY = Math.max(...seq);
+      const xStep = width / Math.max(1, seq.length-1);
+      const scaleY = (m) => height - ((m - minY)/Math.max(1,(maxY-minY))) * (height - 20) - 10;
+      let d = "";
+      seq.forEach((m, i) => { const x = i * xStep, y = scaleY(m); d += (i===0 ? "M" : "L") + x.toFixed(2) + "," + y.toFixed(2) + " "; });
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", d.trim()); path.setAttribute("fill", "none"); path.setAttribute("stroke", "#38bdf8"); path.setAttribute("stroke-width", "3"); els.svg.appendChild(path);
+    }
+
+    let piano = null, pianoLoading = null, current = null;
+    async function getPiano() {
+      if (piano) return piano;
+      if (pianoLoading) return pianoLoading;
+      els.soundStatus.textContent = "Загрузка пианино…";
+      pianoLoading = new Promise((resolve, reject) => {
+        const s = new Tone.Sampler({
+          urls: {
+            A0:"A0.mp3",
+            C1:"C1.mp3","D#1":"Ds1.mp3","F#1":"Fs1.mp3", A1:"A1.mp3",
+            C2:"C2.mp3","D#2":"Ds2.mp3","F#2":"Fs2.mp3", A2:"A2.mp3",
+            C3:"C3.mp3","D#3":"Ds3.mp3","F#3":"Fs3.mp3", A3:"A3.mp3",
+            C4:"C4.mp3","D#4":"Ds4.mp3","F#4":"Fs4.mp3", A4:"A4.mp3",
+            C5:"C5.mp3","D#5":"Ds5.mp3","F#5":"Fs5.mp3", A5:"A5.mp3",
+            C6:"C6.mp3","D#6":"Ds6.mp3","F#6":"Fs6.mp3", A6:"A6.mp3",
+            C7:"C7.mp3","D#7":"Ds7.mp3","F#7":"Fs7.mp3", A7:"A7.mp3",
+            C8:"C8.mp3"
+          },
+          baseUrl: "./salamander/",
+          attack: 0.001, release: 1.2,
+          onload: () => { piano = s; els.soundStatus.textContent = "Готово"; resolve(piano); },
+          onerror: (e) => { els.soundStatus.textContent = "Ошибка загрузки"; reject(e); }
+        }).toDestination();
+      });
+      return pianoLoading;
+    }
+
+    async function ensureAudio(){
+      await getPiano();
+      await Tone.start();
+      current = piano;
+      return current;
+    }
+
+    function stopPlayback(){
+      Tone.Transport.stop(); Tone.Transport.cancel();
+      if(current && current.releaseAll){ try { current.releaseAll(); } catch(e){} }
+      els.btnStop.disabled = true; els.btnPlay.disabled = false;
+    }
+
+    function scheduleCue(startWhen, rootMidi){
+      const mode = document.getElementById("cueMode").value;
+      if(mode === "none") return startWhen;
+      const steps = CUE[mode](rootMidi);
+      let acc = startWhen;
+      for(const step of steps){
+        Tone.Transport.schedule((t)=>{
+          if(step.notes.length>1){ step.notes.forEach(n => current.triggerAttackRelease(midiToNote(n), step.dur, t, 0.9)); }
+          else { current.triggerAttackRelease(midiToNote(step.notes[0]), step.dur, t, 0.9); }
+        }, `+${acc}`);
+        acc += Tone.Time(step.dur).toSeconds();
+      }
+      return acc + 0.06;
+    }
+
+    els.btnPlay.addEventListener("click", async () => {
+      await ensureAudio();
+      stopPlayback();
+      els.btnPlay.disabled = true; els.btnStop.disabled = false;
+
+      const pattern = PATTERNS.find(p=>p.id===els.patternSelect.value);
+      const startMidi = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
+      const repeatSteps = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value||"0",10)));
+      const stepSemis = parseInt(els.stepSemis.value||"0",10);
+      const breathGap = Math.max(0, parseInt(els.breathMs.value||"0",10)) / 1000;
+      const noteDurStr = els.noteDur.value;
+      const noteSec = durToSeconds(noteDurStr);
+
+      const rel = (pattern.type === "degree" ? pattern.data.map(d=>degMajor(d)) : pattern.data.slice());
+      const blocks = Array.from({length: repeatSteps+1}, (_,b)=>{
+        const base = startMidi + b*stepSemis;
+        const seq = rel.map(off => base + off);
+        return dir==="down" ? seq.slice().reverse() : seq;
+      });
+      const flat = blocks.flat();
+      drawGraph(flat);
+      els.noteList.textContent = flat.map(m => midiToNote(m)).join("  ·  " );
+
+      const bpm = parseInt(els.bpm.value||"90",10);
+      Tone.Transport.bpm.value = bpm;
+      let when = 0;
+
+      for (let b = 0; b < blocks.length; b++) {
+        const block = blocks[b];
+        const blockRoot = startMidi + b * stepSemis;
+
+        when = scheduleCue(when, blockRoot);
+
+        for (let i = 0; i < block.length; i++) {
+          const midi = block[i];
+          Tone.Transport.schedule((t) => {
+            current.triggerAttackRelease(midiToNote(midi), noteSec, t, 0.9);
+          }, `+${when + i * noteSec}`);
+        }
+        when += block.length * noteSec + breathGap;
+      }
+
+      Tone.Transport.scheduleOnce(() => { stopPlayback(); }, `+${when + 0.08}`);
+      Tone.Transport.start();
+    });
+
+    els.btnStop.addEventListener("click", stopPlayback);
+
+    els.transpose.addEventListener("input", () => { const v=parseInt(els.transpose.value||"0",10); els.transposeVal.textContent=(v>=0?"+":"")+v; updateStartInfo(); computeAll(); });
+    els.patternSelect.addEventListener("change", () => { updatePatternMeta(); computeAll(); });
+    els.startNote.addEventListener("change", () => { updateStartInfo(); computeAll(); });
+    els.bpm.addEventListener("change", computeAll);
+    els.repeatSteps.addEventListener("change", computeAll);
+    els.stepSemis.addEventListener("change", computeAll);
+    els.breathMs.addEventListener("change", computeAll);
+    els.noteDur.addEventListener("change", computeAll);
+    els.dirUp.addEventListener("click", () => { dir="up"; els.dirUp.classList.add("active"); els.dirDown.classList.remove("active"); els.dirVal.textContent="up"; computeAll(); });
+    els.dirDown.addEventListener("click", () => { dir="down"; els.dirDown.classList.add("active"); els.dirUp.classList.remove("active"); els.dirVal.textContent="down"; computeAll(); });
+
+    function nudge(delta){
+      const m = noteToMidiSafe(els.startNote.value) + delta;
+      const name = NOTE_NAMES[((m%12)+12)%12], oct = Math.floor(m/12)-1;
+      const target = `${name}${oct}`;
+      if([...els.startNote.options].some(o=>o.value===target)){
+        els.startNote.value = target; updateStartInfo(); computeAll();
+      }
+    }
+    els.nudgeUp.addEventListener("click", ()=> nudge(+1));
+    els.nudgeDown.addEventListener("click", ()=> nudge(-1));
+    els.testStart.addEventListener("click", async () => {
+      await ensureAudio();
+      const start = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
+      current.triggerAttackRelease(midiToNote(start), '1n');
+    });
+
+    computeAll();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
+  </script>
+</body>
+</html>

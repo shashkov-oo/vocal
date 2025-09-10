@@ -4,16 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vocal Pattern Trainer — Piano</title>
+
   <style>
     :root { color-scheme: dark; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
-           background: radial-gradient(1200px 600px at 20% -10%, #0b1325 0%, #0a0f1a 45%, #080d16 100%);
-           color: #e5e7eb; }
+    body {
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #0b1325 0%, #0a0f1a 45%, #080d16 100%);
+      color: #e5e7eb;
+    }
     .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
     .card { background: rgba(15, 23, 42, 0.8); border: 1px solid #1f2937; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
     .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
     @media (min-width: 980px){ .row { grid-template-columns: 1fr 1fr; } }
-    .label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; display:block;}
+    .label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; display:block; }
     select, input[type=number], input[type=text] {
       width: 100%; background: #0f172a; color: #e5e7eb; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; outline: none;
     }
@@ -23,6 +27,7 @@
     .btn-stop { background: #ef4444; color: #0b1220; }
     .btn-ghost { background:#0f172a; border:1px solid #334155; color:#e5e7eb; }
     .muted { opacity: .75; font-size: 12px; }
+    .small { font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
     .gridline { stroke: #334155; stroke-dasharray: 4 6; }
     .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
@@ -32,7 +37,6 @@
     .seg { display:flex; border:1px solid #334155; border-radius:12px; overflow:hidden; }
     .seg button { flex:1; background:#0f172a; color:#e5e7eb; padding:8px 10px; border:0; cursor:pointer; }
     .seg button.active { background:#1f2937; }
-    .small { font-size: 12px; }
     .controls { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .controls > div:nth-child(1) { grid-column: 1 / -1; }
   </style>
@@ -45,10 +49,12 @@
         <span class="badge">Tone.js</span>
         <span class="badge">Sampler Piano</span>
         <span class="badge">Breath Pauses</span>
+        <span class="badge">Per-note duration</span>
       </div>
     </div>
 
     <div class="row">
+      <!-- Левая карточка: выбор упражнения -->
       <div class="card">
         <label class="label">Упражнение</label>
         <select id="patternSelect"></select>
@@ -56,6 +62,7 @@
         <p class="muted" style="margin-top:4px">Режим паттерна: <span id="patternMode" class="badge"></span></p>
       </div>
 
+      <!-- Правая карточка: управление -->
       <div class="card controls">
         <div>
           <label class="label">Стартовая нота</label>
@@ -84,7 +91,7 @@
         </div>
         <div>
           <label class="label">Темп (BPM)</label>
-          <input type="number" id="bpm" min="30" max="240" value="90" />
+          <input type="number" id="bpm" min="30" max="240" value="150" />
         </div>
         <div>
           <label class="label">Повторов с шагом</label>
@@ -103,15 +110,15 @@
           </div>
         </div>
         <div>
-          <label class="label">Длительность ноты</label>
+          <label class="label">Длительность ноты (по умолчанию)</label>
           <select id="noteDur">
             <option value="16n">1/16</option>
             <option value="8n" selected>1/8</option>
             <option value="4n">1/4</option>
             <option value="2n">1/2</option>
             <option value="1n">1</option>
-            <option value="1n*2">2 (double whole)</option>
-            <option value="1n*4">4 (longa)</option>
+            <option value="1n*2">2</option>
+            <option value="1n*4">4</option>
           </select>
         </div>
         <div>
@@ -130,6 +137,7 @@
       </div>
     </div>
 
+    <!-- Панель плеера и графика -->
     <div class="card" style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
         <div class="muted">Паттерн: <span id="degreeList"></span></div>
@@ -140,175 +148,374 @@
       </div>
       <div class="muted" style="margin-bottom:8px;">Ноты: <span class="mono" id="noteList"></span></div>
       <div style="overflow-x:auto; border-radius:12px; border:1px solid #1f2937;">
-        <svg id="svg" width="800" height="240" viewBox="0 0 800 240"></svg>
+        <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
       </div>
     </div>
   </div>
 
+  <!-- Tone.js -->
   <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+
   <script>
+    // ==========================================================
+    //  УТИЛИТЫ НОТАЦИИ / ДЛИТЕЛЬНОСТЕЙ
+    // ==========================================================
+
     const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
     const NAME_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n,i)=>[n,i]));
-    function codepoints(s){ return Array.from(s).map(ch=>ch.codePointAt(0)); }
-    function noteToMidiSafe(note){
+
+    /** 'A3' -> MIDI 57 (и т.п.). При ошибке — C4 (60). */
+    function noteToMidiSafe(note) {
       const raw = String(note);
       const s = raw.trim().replace(/♯/g, "#").replace(/♭/g, "b");
       const m = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(s);
-      if(!m){ console.warn("PARSE_FAIL", {raw, s, codes: codepoints(raw)}); return 60; }
-      let name = m[1].toUpperCase(); let acc = m[2]; const oct = parseInt(m[3],10);
-      const flats = { "Cb":"B", "Db":"C#", "Eb":"D#", "Fb":"E", "Gb":"F#", "Ab":"G#", "Bb":"A#" };
-      if(acc === "b"){ name = flats[name+"b"] || (name+"b"); } else if(acc==="#"){ name = name+"#"; }
-      const idx = NAME_TO_SEMITONE[name]; if(idx===undefined){ console.warn("SEMITONE_FAIL", {name, raw}); return 60; }
+      if (!m) { console.warn("PARSE_FAIL", { raw, s }); return 60; }
+
+      let name = m[1].toUpperCase();
+      const acc = m[2];
+      const oct = parseInt(m[3], 10);
+
+      const flats = { Cb:"B", Db:"C#", Eb:"D#", Fb:"E", Gb:"F#", Ab:"G#", Bb:"A#" };
+      if (acc === "b") name = flats[name+"b"] || (name+"b");
+      else if (acc === "#") name = name + "#";
+
+      const idx = NAME_TO_SEMITONE[name];
+      if (idx === undefined) { console.warn("SEMITONE_FAIL", { name, raw }); return 60; }
       return idx + (oct + 1) * 12;
     }
-    function midiToNote(m){ const name = NOTE_NAMES[((m%12)+12)%12]; const oct = Math.floor(m/12) - 1; return name + oct; }
-    function durToSeconds(s){ if(String(s).includes("*")){ const [b,k]=String(s).split("*"); return Tone.Time(b).toSeconds()*parseFloat(k); } return Tone.Time(s).toSeconds(); }
+
+    /** MIDI 69 -> 'A4' и т.п. */
+    function midiToNote(m) {
+      const name = NOTE_NAMES[((m % 12) + 12) % 12];
+      const oct = Math.floor(m / 12) - 1;
+      return name + oct;
+    }
+
+    /** '8n' или '1n*2' -> секунды при текущем BPM (зависит от Tone.Transport.bpm) */
+    function durToSeconds(s) {
+      const str = String(s);
+      if (str.includes("*")) {
+        const [base, k] = str.split("*");
+        return Tone.Time(base).toSeconds() * parseFloat(k);
+      }
+      return Tone.Time(str).toSeconds();
+    }
+
+    /** '8n' -> 0.5 бита, '4n' -> 1 бит, '1n' -> 4 бита (для 4/4); нужно для X-масштаба графика */
+    function durToBeats(s) {
+      const str = String(s);
+      const mult = str.includes('*') ? parseFloat(str.split('*')[1]) : 1;
+      const base = str.split('*')[0];
+      const map = { '16n': 0.25, '8n': 0.5, '4n': 1, '2n': 2, '1n': 4 };
+      return (map[base] ?? 1) * mult;
+    }
+
+    // ==========================================================
+    //  ГАММА / СТУПЕНИ
+    // ==========================================================
+
     const MAJOR_STEPS = [0,2,4,5,7,9,11];
-    const degMajor = (n) => MAJOR_STEPS[((n-1)%7+7)%7] + 12*Math.floor((n-1)/7);
+
+    /** смещение (полутонов) от тоники для мажорной ступени 1..n */
+    function degMajor(n) {
+      const within = ((n - 1) % 7 + 7) % 7;
+      const octs = Math.floor((n - 1) / 7);
+      return MAJOR_STEPS[within] + 12 * octs;
+    }
+
+    // ==========================================================
+    //  ДАННЫЕ ПАТТЕРНОВ
+    //  data: можно число (ступень/полутон) или объект { d|s|v, dur?, repeat? }
+    // ==========================================================
 
     const PATTERNS = [
-      { id:"1", name:"1 трель (губами бр)", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"1 00:00" },
-      { id:"2", name:"2 трель (языком р)", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"2 3:30" },
-      { id:"3", name:"3 трель (губами бр) скачки", type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"3 7:20" },
-      { id:"4", name:"4 трель (языком р) скачки", type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"4 10:10" },
-      { id:"5", name:"5 ней-ней-ней-ней", type:"degree", data:[1,3,5,8,8,8,8,5,3,1], desc:"5 12:52" },
-      { id:"6", name:"6 ней-ней-ней-ней", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"6 15:10" },
-      { id:"7", name:"7 ма-ма-ма-ма плаксиво,но не слишком", type:"degree", data:[1,3,5,8,8,8,8,5,3,1], desc:"7 17:53" },
-      { id:"8", name:"8 ма-ма-ма-ма", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"8 20:36" },
-      { id:"9", name:"9 о-о-о-о-о-о-о-о-о", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"9 23:35" },
-      { id:"10", name:"10 а-а-а-ааааааааа-а-а-а-а", type:"degree", data:[1,3,5,8,5,3,1], desc:"10 e" },
-      { id:"11", name:"11 и-и-и-и-и", type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"11 d 32 min" },
-      { id:"15", name:"15 у-ы закрытый рот", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40" }, //играется тройками, между ними микропауза, последняя нота отдельно
-      { id:"17", name:"17 хм-м-м-м закрытый рот", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"17 43:17" }, 
-      { id:"18", name:"18 хм-м-м-м закрытый рот длинный пик", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"18 46:40" }, //длинный пик
-      { id:"19", name:"19 м-м-м-м закрытый рот", type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"19 50:46" },
-      { id:"20", name:"20 м-м-м-м-мммммааааа-а-а-а (закрытый к открытому)", type:"degree", data:[1,3,5,8,5,3,1], desc:"20 53:56" }, //длинный пик
-      { id:"21", name:"21 о-о-о вниз-вверх-вниз-вверх длинный пик вниз", type:"degree", data:[8,5,3,1,3,5,8,5,3,1,3,5,8,5,3,1], desc:"21 56:45" }, //длинный пик (последний)
-      { id:"22", name:"22 а-а-а-а", type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"22 1:01:30" }, 
-      { id:"23", name:"23 о-о-о-о-а?", type:"degree", data:[1,3,5,8,5,3,1], desc:"23 1:02:32" }, //длинный пик
-      { id:"24", name:"24 и-и-и-иииии-ууууу-ааааа-а-а-а", type:"degree", data:[1,3,5,8,8,8,5,3,1], desc:"24 1:03:25" }, //длинные пики
-      { id:"25", name:"25 о-а колебания +- полтона", type:"semitone", data:[5,4,3,2,1], desc:"25 1:04:48" }, //длинные ноты
-      { id:"26", name:"26 а", type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"26 1:05:06" }, 
-      //дальше с 1:07:00 очень сложно про закрытые гласные и подмены, не конкретные упражнения, а приемы именно в пении для облегчения перехода
-      //плаксивость, подмена "a" на "и", "о" на "у" и все такое
+      { id:"1",  name:"1 трель (губами бр)",              type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"1 00:00" }, //150 bpm
+      { id:"2",  name:"2 трель (языком р)",               type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"2 3:30" }, 
+      { id:"3",  name:"3 трель (губами бр) скачки",       type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"3 7:20" },
+      { id:"4",  name:"4 трель (языком р) скачки",        type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"4 10:10" },
+      { id:"5",  name:"5 ней-ней-ней-ней",                type:"degree",   data:[1,3,5,8,8,8,8,5,3,1], desc:"5 12:52" },
+      { id:"6",  name:"6 ней-ней-ней-ней",                type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"6 15:10" },
+      { id:"7",  name:"7 ма-ма-ма-ма плаксиво",           type:"degree",   data:[1,3,5,8,8,8,8,5,3,1], desc:"7 17:53" },
+      { id:"8",  name:"8 ма-ма-ма-ма",                    type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"8 20:36" },
+      { id:"9",  name:"9 о-о-о-о-о-о-о-о-о",              type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"9 23:35" },
+      { id:"10", name:"10 а-а-а-ааааааааа-а-а-а-а",        type:"degree",   data:[ {d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:5},{d:3},{d:1} ], desc:"10 e" },
+      { id:"11", name:"11 и-и-и-и-и",                      type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"11 d 32 min" },
+      { id:"15", name:"15 у-ы закрытый рот",               type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40" },
+      { id:"17", name:"17 хм-м-м-м закрытый рот",          type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"17 43:17" },
+      { id:"18", name:"18 хм-м-м-м закрытый рот длинный пик", type:"semitone", data:[{d:0},{d:4},{d:7},{d:12},{d:16},{d:19, dur:"1n"},{d:17},{d:14},{d:11},{d:7},{d:5},{d:2},{d:0}], desc:"18 46:40" },
+      { id:"19", name:"19 м-м-м-м закрытый рот",           type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"19 50:46" },
+      { id:"20", name:"20 м-м-м-м-мммммааааа-а-а-а",       type:"degree",   data:[1,3,5,8,5,3,1], desc:"20 53:56" },
+      { id:"21", name:"21 о-о-о вниз/вверх, длинный пик",  type:"degree",   data:[{d:8},{d:5},{d:3},{d:1},{d:3},{d:5},{d:8},{d:5},{d:3},{d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:5},{d:3},{d:1}], desc:"21 56:45" },
+      { id:"22", name:"22 а-а-а-а",                         type:"semitone", data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"22 1:01:30" },
+      { id:"23", name:"23 о-о-о-о-а?",                      type:"degree",   data:[{d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:5},{d:3},{d:1}], desc:"23 1:02:32" },
+      { id:"24", name:"24 и-и-и-иииии-ууууу-ааааа-а-а-а",  type:"degree",   data:[{d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:8, dur:"1n"},{d:8, dur:"1n"},{d:5},{d:3},{d:1}], desc:"24 1:03:25" },
+      { id:"25", name:"25 о-а колебания +- полтона",       type:"semitone", data:[{d:5, dur:"1n"},{d:4, dur:"1n"},{d:3, dur:"1n"},{d:2, dur:"1n"},{d:1, dur:"1n"}], desc:"25 1:04:48" },
+      { id:"26", name:"26 а",                               type:"semitone", data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"26 1:05:06" }
     ];
 
+    // ==========================================================
+    //  CUE (прелюдии перед блоком)
+    // ==========================================================
+
     const CUE = {
-      none: () => [],
-      chord: (rootMidi) => [{notes:[0,4,7].map(s=>rootMidi+s), dur:"4n"}],
-      arp: (rootMidi) => [0,4,7,12].map(s => ({notes:[rootMidi+s], dur:"8n"})),
-      scale: (rootMidi) => [1,2,3,4,5,4,3,2,1].map(d=>({notes:[rootMidi+degMajor(d)], dur:"8n"})),
+      none: function () { return []; },
+      chord: function (rootMidi) {
+        return [{ notes:[0,4,7].map(s => rootMidi + s), dur:"4n" }];
+      },
+      arp: function (rootMidi) {
+        return [0,4,7,12].map(s => ({ notes:[rootMidi+s], dur:"8n" }));
+      },
+      scale: function (rootMidi) {
+        return [1,2,3,4,5,4,3,2,1].map(d => ({ notes:[rootMidi+degMajor(d)], dur:"8n" }));
+      }
     };
+
+    // ==========================================================
+    //  DOM-элементы
+    // ==========================================================
 
     const els = {
       patternSelect: document.getElementById("patternSelect"),
-      patternDesc: document.getElementById("patternDesc"),
-      patternMode: document.getElementById("patternMode"),
-      startNote: document.getElementById("startNote"),
-      startInfo: document.getElementById("startInfo"),
-      transpose: document.getElementById("transpose"),
-      transposeVal: document.getElementById("transposeVal"),
-      dirUp: document.getElementById("dirUp"),
-      dirDown: document.getElementById("dirDown"),
-      dirVal: document.getElementById("dirVal"),
-      bpm: document.getElementById("bpm"),
-      repeatSteps: document.getElementById("repeatSteps"),
-      stepSemis: document.getElementById("stepSemis"),
-      breathMs: document.getElementById("breathMs"),
-      noteDur: document.getElementById("noteDur"),
-      cueMode: document.getElementById("cueMode"),
-      soundStatus: document.getElementById("soundStatus"),
-      degreeList: document.getElementById("degreeList"),
-      noteList: document.getElementById("noteList"),
-      svg: document.getElementById("svg"),
-      btnPlay: document.getElementById("btnPlay"),
-      btnStop: document.getElementById("btnStop"),
-      nudgeUp: document.getElementById("nudgeUp"),
-      nudgeDown: document.getElementById("nudgeDown"),
-      testStart: document.getElementById("testStart"),
+      patternDesc:   document.getElementById("patternDesc"),
+      patternMode:   document.getElementById("patternMode"),
+      startNote:     document.getElementById("startNote"),
+      startInfo:     document.getElementById("startInfo"),
+      transpose:     document.getElementById("transpose"),
+      transposeVal:  document.getElementById("transposeVal"),
+      dirUp:         document.getElementById("dirUp"),
+      dirDown:       document.getElementById("dirDown"),
+      dirVal:        document.getElementById("dirVal"),
+      bpm:           document.getElementById("bpm"),
+      repeatSteps:   document.getElementById("repeatSteps"),
+      stepSemis:     document.getElementById("stepSemis"),
+      breathMs:      document.getElementById("breathMs"),
+      noteDur:       document.getElementById("noteDur"),
+      cueMode:       document.getElementById("cueMode"),
+      soundStatus:   document.getElementById("soundStatus"),
+      degreeList:    document.getElementById("degreeList"),
+      noteList:      document.getElementById("noteList"),
+      svg:           document.getElementById("svg"),
+      btnPlay:       document.getElementById("btnPlay"),
+      btnStop:       document.getElementById("btnStop"),
+      nudgeUp:       document.getElementById("nudgeUp"),
+      nudgeDown:     document.getElementById("nudgeDown"),
+      testStart:     document.getElementById("testStart"),
     };
-    let dir = "up";
 
-    function fillNotes(){
+    let dir = "up"; // направление паттерна
+
+    // ==========================================================
+    //  ИНИЦИАЛИЗАЦИЯ UI
+    // ==========================================================
+
+    function fillNotes() {
       const items = [];
-      for(let o=2;o<=6;o++){ for(const n of NOTE_NAMES){ items.push(`${n}${o}`);} }
-      for(const n of items){
+      for (let o = 2; o <= 6; o++) {
+        for (const n of NOTE_NAMES) items.push(`${n}${o}`);
+      }
+      for (const n of items) {
         const opt = document.createElement("option");
-        opt.value=n; opt.textContent=n; els.startNote.appendChild(opt);
+        opt.value = n; opt.textContent = n;
+        els.startNote.appendChild(opt);
       }
       els.startNote.value = "A2";
       updateStartInfo();
     }
-    function fillPatterns(){
-      for(const p of PATTERNS){
+
+    function patternLabel(p) {
+      if (p.type === "degree") {
+        return p.data.map(d => {
+          const v = (typeof d === 'number') ? d : (d.d ?? d.v);
+          const mark = v > 7 ? (((v - 1) % 7) + 1) + "↑" : v;
+          const rpt = (typeof d === 'object' && d.repeat > 1) ? `×${d.repeat}` : "";
+          return `${mark}${rpt}`;
+        }).join(" – ");
+      }
+      // semitone
+      return p.data.map(s => {
+        const v = (typeof s === 'number') ? s : (s.s ?? s.v);
+        return v >= 0 ? `+${v}` : `${v}`;
+      }).join("  ");
+    }
+
+    function updatePatternMeta() {
+      const p = PATTERNS.find(x => x.id === els.patternSelect.value);
+      els.patternDesc.textContent = p.desc;
+      els.patternMode.textContent = (p.type === "semitone") ? "Semitone offsets" : "Diatonic degrees";
+      els.degreeList.textContent = patternLabel(p);
+    }
+
+    function fillPatterns() {
+      for (const p of PATTERNS) {
         const opt = document.createElement("option");
         opt.value = p.id; opt.textContent = p.name;
         els.patternSelect.appendChild(opt);
       }
-      els.patternSelect.value = PATTERNS[2].id;
+      els.patternSelect.value = PATTERNS[2].id; // по умолчанию #3
       updatePatternMeta();
     }
-    fillNotes(); fillPatterns();
 
-    function updateStartInfo(){
+    function updateStartInfo() {
       const base = noteToMidiSafe(els.startNote.value);
-      const trans = parseInt(els.transpose.value||"0",10);
+      const trans = parseInt(els.transpose.value || "0", 10);
       const midi = base + trans;
       els.startInfo.textContent = `MIDI=${midi} (${midiToNote(midi)})`;
     }
-    function updatePatternMeta(){
-      const p = PATTERNS.find(x=>x.id===els.patternSelect.value);
-      els.patternDesc.textContent = p.desc;
-      els.patternMode.textContent = p.type === "semitone" ? "Semitone offsets" : "Diatonic degrees";
-      let label = "";
-      if(p.type === "degree"){ label = p.data.map(d => d>7 ? (((d-1)%7)+1)+"↑" : d).join(" – "); }
-      else { label = p.data.map(s => (s>=0?`+${s}`:`${s}`)).join("  "); }
-      els.degreeList.textContent = label;
+
+    // ==========================================================
+    //  РАЗВОРАЧИВАНИЕ ПАТТЕРНА / ПОСТРОЕНИЕ ДАННЫХ
+    // ==========================================================
+
+    function expandPatternSteps(pattern, defaultDurStr) {
+      const steps = [];
+      for (const item of pattern.data) {
+        if (typeof item === 'number') {
+          steps.push({ kind: pattern.type, v: item, dur: defaultDurStr });
+        } else {
+          const val = (item.d ?? item.s ?? item.v);
+          const repeat = Math.max(1, item.repeat || 1);
+          const dur = item.dur || defaultDurStr;
+          for (let i = 0; i < repeat; i++) {
+            steps.push({ kind: pattern.type, v: val, dur });
+          }
+        }
+      }
+      return steps;
     }
 
-    function buildPatternSeq(startMidi, pattern){
-      const rel = (pattern.type === "degree") ? pattern.data.map(d => degMajor(d)) : pattern.data.slice();
-      return rel.map(off => startMidi + off);
+    function toMidiFromStep(baseMidi, step) {
+      if (step.kind === 'degree') return baseMidi + degMajor(step.v);
+      return baseMidi + step.v; // semitone
     }
-    function computeAll(){
-      const pattern = PATTERNS.find(p=>p.id===els.patternSelect.value);
-      const startMidi = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
-      const repeatSteps = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value||"0",10)));
-      const stepSemis = parseInt(els.stepSemis.value||"0",10);
+
+    /** соберём steps для визуализации/прослушивания */
+    function computeAll() {
+      const pattern       = PATTERNS.find(p => p.id === els.patternSelect.value);
+      const startMidi     = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value || "0", 10);
+      const repeatSteps   = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value || "0", 10)));
+      const stepSemis     = parseInt(els.stepSemis.value || "0", 10);
+      const defaultDurStr = els.noteDur.value;
 
       const blocks = [];
-      for(let i=0;i<=repeatSteps;i++){
-        const base = startMidi + i*stepSemis;
-        const seq = buildPatternSeq(base, pattern);
-        blocks.push(dir==="down" ? seq.slice().reverse() : seq);
+      for (let i = 0; i <= repeatSteps; i++) {
+        const base = startMidi + i * stepSemis;
+        const steps = expandPatternSteps(pattern, defaultDurStr).map(st => ({
+          midi:   toMidiFromStep(base, st),
+          durStr: st.dur,
+          beats:  durToBeats(st.dur)  // для графика
+        }));
+        blocks.push(dir === "down" ? steps.slice().reverse() : steps);
       }
-      const flatSeq = blocks.flat();
-      drawGraph(flatSeq);
-      els.noteList.textContent = flatSeq.map(m => midiToNote(m)).join("  ·  ");
-      return { blocks, flatSeq, pattern, startMidi, stepSemis };
+
+      const flatSteps = blocks.flat();
+      drawGraphSteps(flatSteps); // перерисуем график
+      els.noteList.textContent = flatSteps.map(s => midiToNote(s.midi)).join("  ·  ");
+
+      return { blocks, flatSteps, pattern, startMidi, stepSemis };
     }
 
-    function drawGraph(seq){
-      const width = Math.max(600, seq.length * 20);
-      const height = 240;
+    // ==========================================================
+    //  ОТРИСОВКА ГРАФИКА (SVG) с подписями нот по Y
+    // ==========================================================
+
+    function drawGraphSteps(steps) {
+      if (!steps.length) { els.svg.innerHTML = ''; return; }
+
+      const gutter    = 64;    // левое поле под подписи нот
+      const pxPerBeat = 80;    // 1 beat = 80px по оси X
+      const height    = 260;
+
+      const totalBeats = steps.reduce((a,s)=>a + (s.beats || 0.5), 0);
+      const contentW   = Math.max(600, Math.max(1, totalBeats) * pxPerBeat);
+      const width      = gutter + contentW;
+
+      // подготовим диапазон по высоте
+      const midis   = steps.map(s => s.midi);
+      const minMidi = Math.min(...midis);
+      const maxMidi = Math.max(...midis);
+
+      function yForMidi(m) {
+        const padding = 10;
+        const usableH = height - padding * 2;
+        const norm = (m - minMidi) / Math.max(1, (maxMidi - minMidi));
+        return height - (norm * usableH + padding);
+      }
+
+      // базовая разметка
       els.svg.setAttribute("width", width);
       els.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
       els.svg.innerHTML = "";
-      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect"); bg.setAttribute("x","0"); bg.setAttribute("y","0"); bg.setAttribute("width", width); bg.setAttribute("height", height); bg.setAttribute("fill", "#0f172a"); els.svg.appendChild(bg);
-      for(let i=1;i<=7;i++){ const line = document.createElementNS("http://www.w3.org/2000/svg", "line"); line.setAttribute("x1","0"); line.setAttribute("x2", String(width)); line.setAttribute("y1", String(i*30)); line.setAttribute("y2", String(i*30)); line.setAttribute("class","gridline"); els.svg.appendChild(line); }
-      if(!seq.length) return;
-      const minY = Math.min(...seq), maxY = Math.max(...seq);
-      const xStep = width / Math.max(1, seq.length-1);
-      const scaleY = (m) => height - ((m - minY)/Math.max(1,(maxY-minY))) * (height - 20) - 10;
-      let d = "";
-      seq.forEach((m, i) => { const x = i * xStep, y = scaleY(m); d += (i===0 ? "M" : "L") + x.toFixed(2) + "," + y.toFixed(2) + " "; });
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", d.trim()); path.setAttribute("fill", "none"); path.setAttribute("stroke", "#38bdf8"); path.setAttribute("stroke-width", "3"); els.svg.appendChild(path);
+
+      // фон
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("x","0"); bg.setAttribute("y","0");
+      bg.setAttribute("width", width); bg.setAttribute("height", height);
+      bg.setAttribute("fill", "#0f172a");
+      els.svg.appendChild(bg);
+
+      // вертикальный разделитель (между подписями и графиком)
+      const sep = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      sep.setAttribute("x1", String(gutter)); sep.setAttribute("x2", String(gutter));
+      sep.setAttribute("y1", "0"); sep.setAttribute("y2", String(height));
+      sep.setAttribute("stroke", "#334155"); sep.setAttribute("stroke-width", "1");
+      els.svg.appendChild(sep);
+
+      // сетка и подписи нот по Y (только уникальные высоты)
+      const uniqueMidis = Array.from(new Set(midis)).sort((a,b)=>b-a); // сверху вниз
+      for (const m of uniqueMidis) {
+        const y = yForMidi(m);
+
+        const gl = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        gl.setAttribute("x1", String(gutter)); gl.setAttribute("x2", String(width));
+        gl.setAttribute("y1", String(y));      gl.setAttribute("y2", String(y));
+        gl.setAttribute("class", "gridline");
+        els.svg.appendChild(gl);
+
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", String(gutter - 10));
+        label.setAttribute("y", String(y + 4));
+        label.setAttribute("fill", "#94a3b8");
+        label.setAttribute("font-size", "11");
+        label.setAttribute("text-anchor", "end");
+        label.textContent = midiToNote(m);
+        els.svg.appendChild(label);
+      }
+
+      // линия мелодии: горизонталь = выдержка ноты, затем мгновенный скачок
+      let x = gutter;
+      let d = `M${x},${yForMidi(steps[0].midi).toFixed(2)} `;
+      for (let i = 0; i < steps.length; i++) {
+        const w = (steps[i].beats || 0.5) * pxPerBeat;
+        const y = yForMidi(steps[i].midi);
+        d += `L${(x + w).toFixed(2)},${y.toFixed(2)} `;
+        x += w;
+        if (i < steps.length - 1) {
+          const yNext = yForMidi(steps[i + 1].midi);
+          d += `L${x.toFixed(2)},${yNext.toFixed(2)} `;
+        }
+      }
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d.trim());
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "#38bdf8");
+      path.setAttribute("stroke-width", "3");
+      els.svg.appendChild(path);
     }
 
-    let piano = null, pianoLoading = null, current = null;
+    // ==========================================================
+    //  АУДИО (Tone.js Sampler)
+    // ==========================================================
+
+    let piano = null;
+    let pianoLoading = null;
+    let current = null;
+
+    /** загрузим сэмплированное пианино (Salamander) */
     async function getPiano() {
       if (piano) return piano;
       if (pianoLoading) return pianoLoading;
+
       els.soundStatus.textContent = "Загрузка пианино…";
       pianoLoading = new Promise((resolve, reject) => {
         const s = new Tone.Sampler({
@@ -324,7 +531,8 @@
             C8:"C8.mp3"
           },
           baseUrl: "./salamander/",
-          attack: 0.001, release: 1.2,
+          attack: 0.001,
+          release: 1.2,
           onload: () => { piano = s; els.soundStatus.textContent = "Готово"; resolve(piano); },
           onerror: (e) => { els.soundStatus.textContent = "Ошибка загрузки"; reject(e); }
         }).toDestination();
@@ -340,103 +548,156 @@
     }
 
     function stopPlayback(){
-      Tone.Transport.stop(); Tone.Transport.cancel();
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      try { Tone.Transport.position = 0; } catch(e){}
       if(current && current.releaseAll){ try { current.releaseAll(); } catch(e){} }
       els.btnStop.disabled = true; els.btnPlay.disabled = false;
     }
 
+    /** запланируем cue перед блоком; возвращает «новое» время when (секунды от старта) */
     function scheduleCue(startWhen, rootMidi){
-      const mode = document.getElementById("cueMode").value;
+      const mode = els.cueMode.value;
       if(mode === "none") return startWhen;
+
       const steps = CUE[mode](rootMidi);
       let acc = startWhen;
       for(const step of steps){
         Tone.Transport.schedule((t)=>{
-          if(step.notes.length>1){ step.notes.forEach(n => current.triggerAttackRelease(midiToNote(n), step.dur, t, 0.9)); }
-          else { current.triggerAttackRelease(midiToNote(step.notes[0]), step.dur, t, 0.9); }
+          if(step.notes.length>1){
+            step.notes.forEach(n => current.triggerAttackRelease(midiToNote(n), step.dur, t, 0.9));
+          } else {
+            current.triggerAttackRelease(midiToNote(step.notes[0]), step.dur, t, 0.9);
+          }
         }, `+${acc}`);
         acc += Tone.Time(step.dur).toSeconds();
       }
-      return acc + 0.06;
+      return acc + 0.06; // маленький отступ после cue
     }
 
-    els.btnPlay.addEventListener("click", async () => {
+    // ==========================================================
+    //  СОБЫТИЯ UI
+    // ==========================================================
+
+    fillNotes();
+    fillPatterns();
+    computeAll(); // первичный график
+
+    // направление
+    els.dirUp.addEventListener("click", function () {
+      dir = "up";
+      els.dirUp.classList.add("active"); els.dirDown.classList.remove("active");
+      els.dirVal.textContent = "up";
+      computeAll();
+    });
+    els.dirDown.addEventListener("click", function () {
+      dir = "down";
+      els.dirDown.classList.add("active"); els.dirUp.classList.remove("active");
+      els.dirVal.textContent = "down";
+      computeAll();
+    });
+
+    // изменения контролов
+    els.transpose.addEventListener("input", function () {
+      const v = parseInt(els.transpose.value || "0", 10);
+      els.transposeVal.textContent = (v>=0?"+":"") + v;
+      updateStartInfo();
+      computeAll();
+    });
+    els.patternSelect.addEventListener("change", function(){ updatePatternMeta(); computeAll(); });
+    els.startNote.addEventListener("change",  function(){ updateStartInfo(); computeAll(); });
+    els.bpm.addEventListener("change",        function(){ computeAll(); });
+    els.repeatSteps.addEventListener("change",function(){ computeAll(); });
+    els.stepSemis.addEventListener("change",  function(){ computeAll(); });
+    els.breathMs.addEventListener("change",   function(){ computeAll(); });
+    els.noteDur.addEventListener("change",    function(){ computeAll(); });
+
+    // сдвиг стартовой ноты
+    function nudge(delta){
+      const m = noteToMidiSafe(els.startNote.value) + delta;
+      const name = NOTE_NAMES[((m%12)+12)%12];
+      const oct  = Math.floor(m/12)-1;
+      const target = `${name}${oct}`;
+      if([...els.startNote.options].some(o=>o.value===target)){
+        els.startNote.value = target;
+        updateStartInfo();
+        computeAll();
+      }
+    }
+    els.nudgeUp.addEventListener("click", ()=> nudge(+1));
+    els.nudgeDown.addEventListener("click", ()=> nudge(-1));
+
+    // тест стартовой ноты
+    els.testStart.addEventListener("click", async function(){
+      await ensureAudio();
+      const start = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value || "0", 10);
+      current.triggerAttackRelease(midiToNote(start), '1n');
+    });
+
+    // проигрывание
+    els.btnPlay.addEventListener("click", async function(){
       await ensureAudio();
       stopPlayback();
       els.btnPlay.disabled = true; els.btnStop.disabled = false;
 
-      const pattern = PATTERNS.find(p=>p.id===els.patternSelect.value);
-      const startMidi = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
-      const repeatSteps = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value||"0",10)));
-      const stepSemis = parseInt(els.stepSemis.value||"0",10);
-      const breathGap = Math.max(0, parseInt(els.breathMs.value||"0",10)) / 1000;
-      const noteDurStr = els.noteDur.value;
-      const noteSec = durToSeconds(noteDurStr);
+      // ВАЖНО: СНАЧАЛА BPM, потом любые Time(...).toSeconds() — это и фиксирует «первый прогон»
+      const bpmVal = parseInt(els.bpm.value || "150", 10);
+      Tone.Transport.bpm.value = bpmVal;
 
-      const rel = (pattern.type === "degree" ? pattern.data.map(d=>degMajor(d)) : pattern.data.slice());
-      const blocks = Array.from({length: repeatSteps+1}, (_,b)=>{
-        const base = startMidi + b*stepSemis;
-        const seq = rel.map(off => base + off);
-        return dir==="down" ? seq.slice().reverse() : seq;
-      });
-      const flat = blocks.flat();
-      drawGraph(flat);
-      els.noteList.textContent = flat.map(m => midiToNote(m)).join("  ·  " );
+      const pattern       = PATTERNS.find(p => p.id === els.patternSelect.value);
+      const startMidi     = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value || "0", 10);
+      const repeatSteps   = Math.max(0, Math.min(48, parseInt(els.repeatSteps.value || "0", 10)));
+      const stepSemis     = parseInt(els.stepSemis.value || "0", 10);
+      const defaultDurStr = els.noteDur.value;
+      const breathGapSec  = Math.max(0, parseInt(els.breathMs.value || "0", 10)) / 1000;
 
-      const bpm = parseInt(els.bpm.value||"90",10);
-      Tone.Transport.bpm.value = bpm;
-      let when = 0;
+      // соберём блоки
+      const blocks = [];
+      for (let b = 0; b <= repeatSteps; b++) {
+        const base = startMidi + b * stepSemis;
+        const steps = expandPatternSteps(pattern, defaultDurStr).map(st => ({
+          midi:   toMidiFromStep(base, st),
+          durStr: st.dur,
+          beats:  durToBeats(st.dur)
+        }));
+        blocks.push(dir === "down" ? steps.slice().reverse() : steps);
+      }
 
+      // перерисуем граф на текущую последовательность
+      const flatSteps = blocks.flat();
+      drawGraphSteps(flatSteps);
+      els.noteList.textContent = flatSteps.map(s => midiToNote(s.midi)).join("  ·  ");
+
+      // планирование нот
+      let when = 0; // секунды относительно момента старта
       for (let b = 0; b < blocks.length; b++) {
         const block = blocks[b];
         const blockRoot = startMidi + b * stepSemis;
 
+        // прелюдия
         when = scheduleCue(when, blockRoot);
 
-        for (let i = 0; i < block.length; i++) {
-          const midi = block[i];
+        // сами ноты блока
+        for (const step of block) {
+          const durSec = durToSeconds(step.durStr);
           Tone.Transport.schedule((t) => {
-            current.triggerAttackRelease(midiToNote(midi), noteSec, t, 0.9);
-          }, `+${when + i * noteSec}`);
+            current.triggerAttackRelease(midiToNote(step.midi), durSec, t, 0.9);
+          }, `+${when}`);
+          when += durSec;
         }
-        when += block.length * noteSec + breathGap;
+
+        // пауза на вдох
+        when += breathGapSec;
       }
 
+      // автостоп
       Tone.Transport.scheduleOnce(() => { stopPlayback(); }, `+${when + 0.08}`);
       Tone.Transport.start();
     });
 
     els.btnStop.addEventListener("click", stopPlayback);
 
-    els.transpose.addEventListener("input", () => { const v=parseInt(els.transpose.value||"0",10); els.transposeVal.textContent=(v>=0?"+":"")+v; updateStartInfo(); computeAll(); });
-    els.patternSelect.addEventListener("change", () => { updatePatternMeta(); computeAll(); });
-    els.startNote.addEventListener("change", () => { updateStartInfo(); computeAll(); });
-    els.bpm.addEventListener("change", computeAll);
-    els.repeatSteps.addEventListener("change", computeAll);
-    els.stepSemis.addEventListener("change", computeAll);
-    els.breathMs.addEventListener("change", computeAll);
-    els.noteDur.addEventListener("change", computeAll);
-    els.dirUp.addEventListener("click", () => { dir="up"; els.dirUp.classList.add("active"); els.dirDown.classList.remove("active"); els.dirVal.textContent="up"; computeAll(); });
-    els.dirDown.addEventListener("click", () => { dir="down"; els.dirDown.classList.add("active"); els.dirUp.classList.remove("active"); els.dirVal.textContent="down"; computeAll(); });
-
-    function nudge(delta){
-      const m = noteToMidiSafe(els.startNote.value) + delta;
-      const name = NOTE_NAMES[((m%12)+12)%12], oct = Math.floor(m/12)-1;
-      const target = `${name}${oct}`;
-      if([...els.startNote.options].some(o=>o.value===target)){
-        els.startNote.value = target; updateStartInfo(); computeAll();
-      }
-    }
-    els.nudgeUp.addEventListener("click", ()=> nudge(+1));
-    els.nudgeDown.addEventListener("click", ()=> nudge(-1));
-    els.testStart.addEventListener("click", async () => {
-      await ensureAudio();
-      const start = noteToMidiSafe(els.startNote.value) + parseInt(els.transpose.value||"0",10);
-      current.triggerAttackRelease(midiToNote(start), '1n');
-    });
-
-    computeAll();
-
+    // SW (если лежит рядом sw.js)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(()=>{});
     }

@@ -3,35 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vocal Pattern Trainer — Piano</title>
+  <title>Развитие голоса по методу Сета Риггса</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="app-container">
     <!-- Topbar -->
     <header class="topbar">
-      <h1 class="title">Vocal Pattern Trainer</h1>
+      <h1 class="title">Развитие голоса по методу Сета Риггса</h1>
       <button id="btnSettings" class="icon-btn" aria-label="Настройки">⚙</button>
     </header>
 
-    <!-- Список упражнений (треки) -->
-    <section class="exercise-list" id="exerciseList">
-      <!-- наполняется в app.js -->
-    </section>
+    <!-- Список упражнений как треки -->
+    <section class="exercise-list" id="exerciseList"></section>
 
-    <!-- Описание выбранного упражнения -->
+    <!-- Описание упражнения -->
     <section class="exercise-desc" id="exerciseDesc">—</section>
 
-    <!-- График -->
-    <section class="graph-wrap">
-      <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
-    </section>
+    <!-- Нижний ДОК: график + панель управления вместе -->
+    <footer class="bottom-dock">
+      <div class="graph-wrap">
+        <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
+      </div>
 
-    <!-- Нижняя панель управления -->
-    <footer class="bottom-bar">
-      <button id="btnPrev" class="transport-btn" aria-label="Предыдущее">⏮</button>
-      <button id="btnPlayStop" class="play-btn" aria-label="Играть">▶️</button>
-      <button id="btnNext" class="transport-btn" aria-label="Следующее">⏭</button>
+      <div class="bottom-bar">
+        <button id="btnPrev" class="transport-btn" aria-label="Предыдущее">⏮</button>
+        <button id="btnPlayStop" class="play-btn" aria-label="Играть">▶️</button>
+        <button id="btnNext" class="transport-btn" aria-label="Следующее">⏭</button>
+      </div>
     </footer>
   </div>
 
@@ -75,6 +74,10 @@
         </select>
       </label>
 
+      <label class="label">Пауза на вдох между повторами (мс)
+        <input id="breathMs" type="number" min="0" max="8000" value="800"/>
+      </label>
+
       <div class="modal-actions">
         <button id="btnCloseSettings" class="btn">Закрыть</button>
       </div>
@@ -91,6 +94,7 @@
   <script src="./app.js"></script>
 
   <script>
+    // Во время разработки можно временно отключить SW, чтобы избежать кэширования
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(()=>{});
     }

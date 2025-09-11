@@ -1,6 +1,5 @@
-// app.js — новый UI-флоу: список-треки, описание, график, нижний транспорт
+// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание
 (function () {
-  // ---------- DOM ----------
   const els = {
     exerciseList: document.getElementById("exerciseList"),
     exerciseDesc: document.getElementById("exerciseDesc"),
@@ -18,33 +17,28 @@
     lowerNote: document.getElementById("lowerNote"),
     upperNote: document.getElementById("upperNote"),
     noteDur: document.getElementById("noteDur"),
+    breathMs: document.getElementById("breathMs"),
   };
 
-  // ---------- state ----------
-  let currentIndex = 0; // индекс выбранного упражнения
+  let currentIndex = 0;
   let isPlaying = false;
 
-  // ---------- safety: examples stub (если не добавил в audio.js блок VPT.examples) ----------
   window.VPT = window.VPT || {};
   if (!VPT.examples) {
     VPT.examples = {
       async play(id) { console.warn(`examples/${id}.mp3: плеер примеров ещё не подключён`); },
-      stop() { /* no-op */ },
+      stop() {},
       isPlaying() { return false; }
     };
   }
 
-  // ---------- helpers ----------
   function fillNoteSelect(sel, def) {
     const items = [];
-    for (let o = 2; o <= 6; o++) {
-      for (const n of VPT.NOTE_NAMES) items.push(`${n}${o}`);
-    }
+    for (let o = 2; o <= 6; o++) for (const n of VPT.NOTE_NAMES) items.push(`${n}${o}`);
     sel.innerHTML = "";
     for (const n of items) {
       const opt = document.createElement("option");
-      opt.value = n;
-      opt.textContent = n;
+      opt.value = n; opt.textContent = n;
       sel.appendChild(opt);
     }
     sel.value = def;
@@ -78,25 +72,18 @@
       example.textContent = "▶ пример";
       example.title = "Эталон (из папки examples)";
 
-      // клик по "пример" — не выбирает упражнение, только играет/стопает пример
       example.addEventListener("click", async (e) => {
         e.stopPropagation();
-
-        // если уже играет этот пример — стоп
         if (VPT.examples.isPlaying(p.id)) {
           VPT.examples.stop();
           example.textContent = "▶ пример";
           return;
         }
-
-        // перед запуском примера — стоп основного воспроизведения и других примеров
         if (isPlaying) stop();
         VPT.examples.stop();
-        // сброс подписей у остальных кнопок "пример"
         [...els.exerciseList.querySelectorAll(".example")].forEach(btn => {
           if (btn !== example) btn.textContent = "▶ пример";
         });
-
         await VPT.examples.play(p.id);
         example.textContent = "⏹ пример";
       });
@@ -104,7 +91,6 @@
       row.appendChild(avatar);
       row.appendChild(title);
       row.appendChild(example);
-
       row.addEventListener("click", () => selectIndex(idx));
       els.exerciseList.appendChild(row);
     });
@@ -118,8 +104,8 @@
   }
 
   async function loadDescription(id, fallback) {
-    // пытаемся подтянуть examples/<id>.txt ; если нет — показываем desc из patterns
     try {
+      // у тебя файлы вида 1.mp3.txt — подтягиваем именно их
       const resp = await fetch(`./examples/${id}.mp3.txt`, { cache: "no-store" });
       if (!resp.ok) throw new Error("no txt");
       const text = await resp.text();
@@ -133,61 +119,48 @@
     const res = patternByIndex(i);
     if (!res) return;
 
-    // при переключении — стоп примера и сброс подписей
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
 
     currentIndex = res.idx;
     highlightActive();
 
-    // описание
     loadDescription(res.obj.id, res.obj.desc);
 
-    // превью графика от стартовой ноты (если модалка ещё не открывалась — A2)
     const root = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const steps = VPT.buildStepsForRoot(root, els.noteDur.value, res.obj);
     VPT.drawGraph(steps, els.svg);
   }
 
-  function updatePreview() {
-    // перерисовать график/описание для текущего
-    selectIndex(currentIndex);
-  }
+  function updatePreview() { selectIndex(currentIndex); }
 
-  // ---------- транспорт ----------
   async function play() {
     const patObj = patternByIndex(currentIndex)?.obj;
     if (!patObj) return;
 
-    // стоп примера перед запуском основного проигрывания
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
 
-    // UI
     els.btnPlayStop.textContent = "⏹";
     els.btnPlayStop.classList.add("stop");
     isPlaying = true;
 
-    // audio init
     try {
       await VPT.audio.ensure();
       await Tone.start();
-    } catch (e) {
-      console.error("Audio load error", e);
-    }
+    } catch(e) { console.error("Audio load error", e); }
 
-    // фикс первой скорости — BPM до расчётов
     Tone.Transport.bpm.value = parseInt(els.bpm.value || "90", 10);
     VPT.audio.stop();
 
-    const mode = els.runMode.value;         // 'single' | 'range'
+    const mode       = els.runMode.value;          // 'single' | 'range'
     const defaultDur = els.noteDur.value;
-    const startMidi = VPT.noteToMidiSafe(els.startNote.value || "A2");
-    const lower = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
-    const upper = VPT.noteToMidiSafe(els.upperNote.value || "G4");
+    const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
+    const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
+    const upper      = VPT.noteToMidiSafe(els.upperNote.value || "G4");
+    const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
 
     if (mode === "single") {
-      // один прогон от стартовой
       const steps = VPT.buildStepsForRoot(startMidi, defaultDur, patObj);
       VPT.drawGraph(steps, els.svg);
 
@@ -204,17 +177,18 @@
       return;
     }
 
-    // режим "диапазон": шаг 1 полутон, верх паттерна не превышает upper
+    // режим "диапазон": шаг 1 полутон, с паузами на вдох между блоками
     const maxOff = VPT.patternMaxOffsetSemitones(patObj);
     const roots = [];
     for (let r = lower; r + maxOff <= upper; r += 1) roots.push(r);
     if (!roots.length) roots.push(Math.max(lower, upper - maxOff));
 
     let when = 0;
-    for (const root of roots) {
+    for (let idx = 0; idx < roots.length; idx++) {
+      const root = roots[idx];
       const steps = VPT.buildStepsForRoot(root, defaultDur, patObj);
 
-      // обновляем график перед исполнением текущего шага
+      // перерисовываем график перед блоком
       Tone.Transport.schedule(() => { VPT.drawGraph(steps, els.svg); }, `+${when}`);
 
       for (const st of steps) {
@@ -224,7 +198,13 @@
         }, `+${when}`);
         when += dur;
       }
+
+      // пауза на вдох (кроме последнего блока)
+      if (breathSec > 0 && idx < roots.length - 1) {
+        when += breathSec;
+      }
     }
+
     Tone.Transport.scheduleOnce(() => stop(), `+${when + 0.08}`);
     Tone.Transport.start();
   }
@@ -239,35 +219,30 @@
   function next() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    const wasPlaying = isPlaying;
-    if (wasPlaying) stop();
+    const was = isPlaying; if (was) stop();
     selectIndex((currentIndex + 1) % total);
-    if (wasPlaying) play();
+    if (was) play();
   }
 
   function prev() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    const wasPlaying = isPlaying;
-    if (wasPlaying) stop();
+    const was = isPlaying; if (was) stop();
     selectIndex((currentIndex - 1 + total) % total);
-    if (wasPlaying) play();
+    if (was) play();
   }
 
-  // ---------- init ----------
+  // init
   fillNoteSelect(els.startNote, "A2");
   fillNoteSelect(els.lowerNote, "A2");
   fillNoteSelect(els.upperNote, "G4");
-
   renderExerciseList();
-  selectIndex(0); // выбрать первое
+  selectIndex(0);
 
-  // события транспорта
   els.btnPlayStop.addEventListener("click", () => (isPlaying ? stop() : play()));
   els.btnNext.addEventListener("click", next);
   els.btnPrev.addEventListener("click", prev);
 
-  // модалка
   els.btnSettings.addEventListener("click", () => {
     els.settingsModal.classList.remove("hidden");
     els.settingsModal.setAttribute("aria-hidden", "false");
@@ -275,11 +250,12 @@
   els.btnCloseSettings.addEventListener("click", () => {
     els.settingsModal.classList.add("hidden");
     els.settingsModal.setAttribute("aria-hidden", "true");
-    if (!isPlaying) updatePreview(); // обновим превью после изменения настроек
+    if (!isPlaying) updatePreview();
   });
 
-  // лайв-обновление превью при изменении настроек (если не играет)
-  [els.bpm, els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur].forEach(ctrl => {
-    ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); });
-  });
+  [els.bpm, els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
+    .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
+
+  // ресайз окна — пересчитать масштаб X и перерисовать график
+  window.addEventListener('resize', () => { if (!isPlaying) updatePreview(); });
 })();

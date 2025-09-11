@@ -7,90 +7,76 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <h1 class="title">Vocal Pattern Trainer — Piano</h1>
-      <div class="inline">
-        <span class="badge">Tone.js</span>
-        <span class="badge">Sampler</span>
-        <span class="badge">Range mode</span>
-        <span class="badge">Per-note duration</span>
-      </div>
-    </div>
+  <div class="app-container">
+    <!-- Topbar -->
+    <header class="topbar">
+      <h1 class="title">Vocal Pattern Trainer</h1>
+      <button id="btnSettings" class="icon-btn" aria-label="Настройки">⚙</button>
+    </header>
 
-    <div class="row">
-      <div class="card">
-        <div class="row-3">
-          <div>
-            <label class="label">Нижняя нота (min)</label>
-            <select id="lowerNote"></select>
-          </div>
-          <div>
-            <label class="label">Стартовая нота</label>
-            <select id="startNote"></select>
-          </div>
-          <div>
-            <label class="label">Верхняя нота (max)</label>
-            <select id="upperNote"></select>
-          </div>
-        </div>
+    <!-- Список упражнений (треки) -->
+    <section class="exercise-list" id="exerciseList">
+      <!-- наполняется в app.js -->
+    </section>
 
-        <div class="row-3" style="margin-top:12px;">
-          <div>
-            <label class="label">Режим</label>
-            <select id="runMode">
-              <option value="single">От стартовой (1 повтор)</option>
-              <option value="range" selected>В пределах диапазона</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">BPM</label>
-            <input id="bpm" type="number" min="30" max="240" value="90" />
-          </div>
-          <div>
-            <label class="label">Длительность (по умолчанию)</label>
-            <select id="noteDur">
-              <option value="16n">1/16</option>
-              <option value="8n" selected>1/8</option>
-              <option value="4n">1/4</option>
-              <option value="2n">1/2</option>
-              <option value="1n">1</option>
-              <option value="1n*2">2</option>
-              <option value="1n*4">4</option>
-            </select>
-          </div>
-        </div>
+    <!-- Описание выбранного упражнения -->
+    <section class="exercise-desc" id="exerciseDesc">—</section>
 
-        <div class="row-3" style="margin-top:12px;">
-          <div>
-            <label class="label">Упражнение</label>
-            <select id="patternSelect"></select>
-            <p id="patternDesc" class="muted" style="margin-top:6px;"></p>
-            <p class="muted" style="margin-top:2px;">Режим паттерна: <span id="patternMode" class="badge"></span></p>
-          </div>
-          <div>
-            <label class="label">Звук</label>
-            <div id="soundStatus" class="muted small">Не загружен</div>
-          </div>
-          <div>
-            <label class="label">Управление</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <button class="btn btn-play" id="btnPlay">▶️ Проиграть</button>
-              <button class="btn btn-stop" id="btnStop" disabled>⏹ Остановить</button>
-            </div>
-          </div>
-        </div>
+    <!-- График -->
+    <section class="graph-wrap">
+      <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
+    </section>
 
-        <p class="muted small" style="margin-top:8px">
-          В режиме диапазона график и список нот показывают <em>только текущий шаг</em> (A2 → A#2 → B2 …), а не длинную «портянку».
-        </p>
-      </div>
+    <!-- Нижняя панель управления -->
+    <footer class="bottom-bar">
+      <button id="btnPrev" class="transport-btn" aria-label="Предыдущее">⏮</button>
+      <button id="btnPlayStop" class="play-btn" aria-label="Играть">▶️</button>
+      <button id="btnNext" class="transport-btn" aria-label="Следующее">⏭</button>
+    </footer>
+  </div>
 
-      <div class="card">
-        <div class="muted" style="margin-bottom:8px;">Ноты: <span class="mono" id="noteList"></span></div>
-        <div class="graph-wrap">
-          <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
-        </div>
+  <!-- Модалка настроек -->
+  <div class="modal hidden" id="settingsModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Настройки</h2>
+
+      <label class="label">BPM
+        <input id="bpm" type="number" min="30" max="240" value="90"/>
+      </label>
+
+      <label class="label">Режим
+        <select id="runMode">
+          <option value="single">От стартовой (1 повтор)</option>
+          <option value="range" selected>В пределах диапазона</option>
+        </select>
+      </label>
+
+      <label class="label">Стартовая нота (для режима «От стартовой»)
+        <select id="startNote"></select>
+      </label>
+
+      <label class="label">Нижняя нота (min)
+        <select id="lowerNote"></select>
+      </label>
+
+      <label class="label">Верхняя нота (max)
+        <select id="upperNote"></select>
+      </label>
+
+      <label class="label">Длительность (по умолчанию)
+        <select id="noteDur">
+          <option value="16n">1/16</option>
+          <option value="8n" selected>1/8</option>
+          <option value="4n">1/4</option>
+          <option value="2n">1/2</option>
+          <option value="1n">1</option>
+          <option value="1n*2">2</option>
+          <option value="1n*4">4</option>
+        </select>
+      </label>
+
+      <div class="modal-actions">
+        <button id="btnCloseSettings" class="btn">Закрыть</button>
       </div>
     </div>
   </div>
@@ -98,7 +84,7 @@
   <!-- libs -->
   <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
 
-  <!-- app modules (глобальный namespace window.VPT) -->
+  <!-- app modules -->
   <script src="./patterns.js"></script>
   <script src="./graph.js"></script>
   <script src="./audio.js"></script>

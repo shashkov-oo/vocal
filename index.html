@@ -14,13 +14,13 @@
       <button id="btnSettings" class="icon-btn" aria-label="Настройки">⚙</button>
     </header>
 
-    <!-- Список упражнений как треки -->
+    <!-- Список упражнений -->
     <section class="exercise-list" id="exerciseList"></section>
 
-    <!-- Описание упражнения -->
+    <!-- Описание -->
     <section class="exercise-desc" id="exerciseDesc">—</section>
 
-    <!-- Нижний ДОК: график + панель управления вместе -->
+    <!-- Нижний док: график + панель управления -->
     <footer class="bottom-dock">
       <div class="graph-wrap">
         <svg id="svg" width="900" height="260" viewBox="0 0 900 260"></svg>
@@ -94,7 +94,6 @@
   <script src="./app.js"></script>
 
   <script>
-    // Во время разработки можно временно отключить SW, чтобы избежать кэширования
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(()=>{});
     }

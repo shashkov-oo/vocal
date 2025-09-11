@@ -116,21 +116,26 @@
   }
 
   function selectIndex(i) {
-    const res = patternByIndex(i);
-    if (!res) return;
-
+    // при переключении останавливаем текущее воспроизведение
+    if (isPlaying) {
+      stop();
+    }
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
-
+  
+    const res = patternByIndex(i);
+    if (!res) return;
+  
     currentIndex = res.idx;
     highlightActive();
-
+  
     loadDescription(res.obj.id, res.obj.desc);
-
+  
     const root = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const steps = VPT.buildStepsForRoot(root, els.noteDur.value, res.obj);
     VPT.drawGraph(steps, els.svg);
   }
+  
 
   function updatePreview() { selectIndex(currentIndex); }
 
@@ -219,18 +224,25 @@
   function next() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    const was = isPlaying; if (was) stop();
+  
+    // всегда стопаем всё перед переключением
+    if (isPlaying) stop();
+    VPT.examples.stop();
+  
     selectIndex((currentIndex + 1) % total);
-    if (was) play();
   }
-
+  
   function prev() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    const was = isPlaying; if (was) stop();
+  
+    // всегда стопаем всё перед переключением
+    if (isPlaying) stop();
+    VPT.examples.stop();
+  
     selectIndex((currentIndex - 1 + total) % total);
-    if (was) play();
   }
+  
 
   // init
   fillNoteSelect(els.startNote, "A2");
@@ -242,16 +254,37 @@
   els.btnPlayStop.addEventListener("click", () => (isPlaying ? stop() : play()));
   els.btnNext.addEventListener("click", next);
   els.btnPrev.addEventListener("click", prev);
-
+  
+  // открыть модалку
   els.btnSettings.addEventListener("click", () => {
     els.settingsModal.classList.remove("hidden");
     els.settingsModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
   });
-  els.btnCloseSettings.addEventListener("click", () => {
+  
+  // функция закрытия
+  function closeSettingsModal(){
     els.settingsModal.classList.add("hidden");
     els.settingsModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
     if (!isPlaying) updatePreview();
+  }
+  
+  // кнопка "Закрыть"
+  els.btnCloseSettings.addEventListener("click", closeSettingsModal);
+  
+  // клик по подложке
+  els.settingsModal.addEventListener("click", (e) => {
+    if (e.target === els.settingsModal) closeSettingsModal();
   });
+  
+  // Esc
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !els.settingsModal.classList.contains("hidden")) {
+      closeSettingsModal();
+    }
+  });
+  
 
   [els.bpm, els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
     .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));

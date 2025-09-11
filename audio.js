@@ -41,3 +41,47 @@ VPT.audio = (function(){
 
   return { ensure, stop, get: ()=>sampler };
 })();
+
+// ===== Examples player (examples/<id>.mp3) =====
+window.VPT = window.VPT || {};
+VPT.examples = (function(){
+  const players = new Map(); // id -> Tone.Player
+  let currentId = null;
+
+  async function getPlayer(id){
+    if(players.has(id)) return players.get(id);
+    const url = `./examples/${id}.mp3`;
+    return new Promise((resolve, reject)=>{
+      const p = new Tone.Player({
+        url,
+        onload: ()=>resolve(p),
+        onerror: (e)=>reject(e)
+      }).toDestination();
+      players.set(id, p);
+    });
+  }
+
+  async function play(id){
+    try{
+      const p = await getPlayer(id);
+      stop();                 // останавливаем предыдущий пример, если был
+      await Tone.start();     // на iOS/Chrome нужен жест пользователя
+      p.start();
+      currentId = id;
+    }catch(e){
+      console.warn(`Нет файла примера examples/${id}.mp3 или ошибка загрузки`, e);
+    }
+  }
+
+  function stop(){
+    if(currentId != null){
+      const p = players.get(currentId);
+      if(p){ try{ p.stop(); } catch(e){} }
+      currentId = null;
+    }
+  }
+
+  function isPlaying(id){ return currentId === id; }
+
+  return { play, stop, isPlaying };
+})();

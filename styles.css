@@ -23,90 +23,185 @@ body {
 .title { font-weight: 800; font-size: 1.1rem; }
 .icon-btn { background: transparent; border: 0; color: #e5e7eb; font-size: 1.4rem; cursor: pointer; }
 
-/* Список упражнений */
+/* ====== УПЛОТНЁННЫЙ СПИСОК УПРАЖНЕНИЙ ====== */
 .exercise-list {
-  display: flex; flex-direction: column; gap: 8px;
-  max-height: 36vh; overflow: auto; padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;                    /* меньше расстояние */
+  max-height: 36vh;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .exercise-item {
-  display: grid; grid-template-columns: 36px 1fr 80px;
-  align-items: center; gap: 10px;
-  background: #111827; border: 1px solid #334155; border-radius: 12px;
-  padding: 8px 10px; cursor: pointer;
+  display: grid;
+  grid-template-columns: 28px 1fr 65px; /* более узкие колонки */
+  align-items: center;
+  gap: 6px;
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 8px;          /* меньше радиус */
+  padding: 1px 2px;            /* компактные отступы */
+  cursor: pointer;
+  font-size: 0.85rem;
 }
+
 .exercise-item .avatar {
-  width: 28px; height: 28px; border-radius: 999px;
-  background: #6366f1; display: grid; place-items: center;
-  font-weight: 800; font-size: 0.8rem; color: #0b1325;
+  width: 22px; height: 22px;
+  border-radius: 999px;
+  background: #6366f1;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 0.65rem;
+  color: #0b1325;
 }
-.exercise-item .title { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.exercise-item .title {
+  font-size: 0.85rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .exercise-item .example {
-  justify-self: end; background: #1f2937; border: 1px solid #374151; color: #e5e7eb;
-  border-radius: 10px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer;
+  justify-self: end;
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 1px 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
-.exercise-item.active { border-color: #3b82f6; background: #0f172a; }
+
+.exercise-item.active {
+  border-color: #3b82f6;
+  background: #0f172a;
+}
 
 /* Описание */
-.exercise-desc { min-height: 2em; font-size: 0.92rem; opacity: 0.9; padding-left: 2px; }
+.exercise-desc {
+  min-height: 2em;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  padding-left: 2px;
+}
 
-/* Нижний док */
+/* ====== НИЖНИЙ ДОК: график + панель управления ====== */
 .bottom-dock {
   margin-top: auto;
   position: sticky;
   bottom: 0;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding-bottom: env(safe-area-inset-bottom, 8px);
   background: linear-gradient(180deg, rgba(11,19,37,0) 0%, rgba(11,19,37,0.85) 30%, #0b1325 100%);
   backdrop-filter: blur(2px);
   z-index: 10;
 }
+
 .bottom-dock .graph-wrap {
-  border: 1px solid #1f2937; border-radius: 12px;
-  background: #0f172a; overflow: hidden; width: 100%;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  background: #0f172a;
+  overflow: hidden;
+  width: 100%;
 }
+
 .bottom-dock .bottom-bar {
-  display: grid; grid-template-columns: 1fr auto 1fr;
-  align-items: center; gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
 }
+
 .transport-btn {
-  background: #1f2937; color: #e5e7eb;
-  border: 0; padding: 12px;
-  border-radius: 12px; font-size: 1rem; cursor: pointer;
+  background: #1f2937;
+  color: #e5e7eb;
+  border: 0;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
+
 .play-btn {
-  background: #22c55e; color: #0b1325;
-  border: 0; padding: 12px 22px;
-  border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer;
+  background: #22c55e;
+  color: #0b1325;
+  border: 0;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 .play-btn.stop { background: #ef4444; }
 
-/* Модалка поверх всего */
+/* ====== МОДАЛКА ====== */
 .modal {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   z-index: 9999;
   background: rgba(0,0,0,0.6);
-  display: flex; justify-content: center; align-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 .modal.hidden { display: none; }
+
 .modal-content {
-  position: relative; z-index: 10000;
+  position: relative;
+  z-index: 10000;
   background: #1e293b;
-  padding: 18px; border-radius: 12px;
-  width: min(420px, 92vw);
+  padding: 16px;
+  border-radius: 10px;
+  width: min(400px, 92vw);
 }
-.label { display: block; margin-top: 10px; font-size: 0.9rem; }
-.label input, .label select {
-  width: 100%; margin-top: 4px;
-  background: #0f172a; color: #e5e7eb;
-  border: 1px solid #334155; border-radius: 10px;
-  padding: 8px 10px;
+
+.label {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85rem;
 }
-.modal-actions { margin-top: 14px; text-align: right; }
-.btn { background: #334155; border: 0; border-radius: 10px; color: #e5e7eb; padding: 8px 14px; cursor: pointer; }
+.label input,
+.label select {
+  width: 100%;
+  margin-top: 3px;
+  background: #0f172a;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.modal-actions {
+  margin-top: 12px;
+  text-align: right;
+}
+
+.btn {
+  background: #334155;
+  border: 0;
+  border-radius: 8px;
+  color: #e5e7eb;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
 
 /* body-lock при модалке */
 body.modal-open { overflow: hidden; }
-body.modal-open .bottom-dock { pointer-events: none; filter: saturate(0.9) blur(0.5px); }
+body.modal-open .bottom-dock {
+  pointer-events: none;
+  filter: saturate(0.9) blur(0.5px);
+}
 
-@media (min-width: 980px){ .exercise-list { max-height: 40vh; } }
+/* Адаптив */
+@media (min-width: 980px) {
+  .exercise-list { max-height: 40vh; }
+}
+@media (max-width: 480px) {
+  .bottom-dock .graph-wrap svg { height: 200px; }
+}

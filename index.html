@@ -3,16 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Развитие голоса по методу Сета Риггса</title>
+  <title>Vocal Pattern Trainer — Piano</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="icon" href="favicon.ico">
 </head>
 <body>
   <div class="app-container">
     <!-- Topbar -->
     <header class="topbar">
-      <h1 class="title">Развитие голоса по методу Сета Риггса</h1>
+      <h1 class="title">Развитие голоса</h1>
       <button id="btnSettings" class="icon-btn" aria-label="Настройки">⚙</button>
     </header>
+
+    <!-- Питч-панель (новая) -->
+    <div id="pitchPanel" class="pitch-panel" style="display:flex;gap:8px;align-items:center;">
+      <button id="btnPitch" class="btn">🎤 Включить питч-трекер</button>
+      <span id="liveNote">…</span>
+    </div>
 
     <!-- Список упражнений -->
     <section class="exercise-list" id="exerciseList"></section>
@@ -84,14 +91,18 @@
     </div>
   </div>
 
-  <!-- libs -->
-  <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+<!-- libs -->
+<script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
 
-  <!-- app modules -->
-  <script src="./patterns.js"></script>
-  <script src="./graph.js"></script>
-  <script src="./audio.js"></script>
-  <script src="./app.js"></script>
+<!-- ТОЛЬКО ml5, без отдельного tfjs! -->
+<script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
+
+<!-- app modules -->
+<script src="./patterns.js"></script>
+<script src="./graph.js"></script>
+<script src="./audio.js"></script>
+<script src="./app.js"></script>
+<script src="./pitch.js"></script>
 
   <script>
     if ('serviceWorker' in navigator) {

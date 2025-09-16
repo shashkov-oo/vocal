@@ -4,15 +4,19 @@
     exerciseList: document.getElementById("exerciseList"),
     exerciseDesc: document.getElementById("exerciseDesc"),
     svg: document.getElementById("svg"),
+
     btnPrev: document.getElementById("btnPrev"),
     btnPlayStop: document.getElementById("btnPlayStop"),
     btnNext: document.getElementById("btnNext"),
+
     // settings modal
     btnSettings: document.getElementById("btnSettings"),
     settingsModal: document.getElementById("settingsModal"),
     btnCloseSettings: document.getElementById("btnCloseSettings"),
+
+    // controls
     bpm: document.getElementById("bpm"),
-    runMode: document.getElementById("runMode"),
+    runMode: document.getElementById("runMode"),      // 'single' | 'range'
     startNote: document.getElementById("startNote"),
     lowerNote: document.getElementById("lowerNote"),
     upperNote: document.getElementById("upperNote"),
@@ -23,6 +27,11 @@
   let currentIndex = 0;
   let isPlaying = false;
 
+  // для перерисовки графика «мгновенно» при смещении guide
+  let lastMidis = [];
+  let lastBeats = [];
+
+  // safety: заглушка для примеров (если audio.js ещё не подгрузился)
   window.VPT = window.VPT || {};
   if (!VPT.examples) {
     VPT.examples = {
@@ -32,6 +41,7 @@
     };
   }
 
+  // ---------- helpers ----------
   function fillNoteSelect(sel, def) {
     const items = [];
     for (let o = 2; o <= 6; o++) for (const n of VPT.NOTE_NAMES) items.push(`${n}${o}`);
@@ -105,7 +115,6 @@
 
   async function loadDescription(id, fallback) {
     try {
-      // у тебя файлы вида 1.mp3.txt — подтягиваем именно их
       const resp = await fetch(`./examples/${id}.mp3.txt`, { cache: "no-store" });
       if (!resp.ok) throw new Error("no txt");
       const text = await resp.text();
@@ -115,34 +124,45 @@
     }
   }
 
+  function drawFromSteps(steps) {
+    lastMidis = steps.map(s => s.midi);
+    lastBeats = steps.map(s => s.beats);
+    VPT.drawGraph(lastMidis, lastBeats);
+  }
+
   function selectIndex(i) {
-    // при переключении останавливаем текущее воспроизведение
-    if (isPlaying) {
-      stop();
-    }
+    // при переключении всегда стопаем всё
+    if (isPlaying) stop();
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
-  
+
     const res = patternByIndex(i);
     if (!res) return;
-  
+
     currentIndex = res.idx;
     highlightActive();
-  
+
     loadDescription(res.obj.id, res.obj.desc);
-  
+
     const root = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const steps = VPT.buildStepsForRoot(root, els.noteDur.value, res.obj);
-    VPT.drawGraph(steps, els.svg);
+
+    drawFromSteps(steps);
+    // «оранжевая» линия — на первый шаг паттерна
+    if (steps.length) {
+      VPT.setGuideNote(steps[0].midi);
+      VPT.drawGraph(lastMidis, lastBeats);
+    }
   }
-  
 
   function updatePreview() { selectIndex(currentIndex); }
 
+  // ---------- транспорт ----------
   async function play() {
     const patObj = patternByIndex(currentIndex)?.obj;
     if (!patObj) return;
 
+    // стопаем все чужие источники
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
 
@@ -162,27 +182,36 @@
     const defaultDur = els.noteDur.value;
     const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
-    const upper      = VPT.noteToMidiSafe(els.upperNote.value || "G4");
+    const upper      = VPT.noteToMidiSafe(els.upperNote.value || "A4");
     const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
 
     if (mode === "single") {
       const steps = VPT.buildStepsForRoot(startMidi, defaultDur, patObj);
-      VPT.drawGraph(steps, els.svg);
+      drawFromSteps(steps);
 
       let when = 0;
       for (const st of steps) {
         const dur = VPT.durToSeconds(st.durStr);
+
+        // перед стартом шага двигаем guide и перерисовываем график
+        Tone.Transport.schedule(() => {
+          VPT.setGuideNote(st.midi);
+          VPT.drawGraph(lastMidis, lastBeats);
+        }, `+${when}`);
+
         Tone.Transport.schedule((t) => {
           VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
         }, `+${when}`);
+
         when += dur;
       }
+
       Tone.Transport.scheduleOnce(() => stop(), `+${when + 0.08}`);
       Tone.Transport.start();
       return;
     }
 
-    // режим "диапазон": шаг 1 полутон, с паузами на вдох между блоками
+    // режим "диапазон": шаг в 1 полутон, с паузами на вдох между блоками
     const maxOff = VPT.patternMaxOffsetSemitones(patObj);
     const roots = [];
     for (let r = lower; r + maxOff <= upper; r += 1) roots.push(r);
@@ -193,14 +222,28 @@
       const root = roots[idx];
       const steps = VPT.buildStepsForRoot(root, defaultDur, patObj);
 
-      // перерисовываем график перед блоком
-      Tone.Transport.schedule(() => { VPT.drawGraph(steps, els.svg); }, `+${when}`);
+      // перерисовываем график под новый блок
+      Tone.Transport.schedule(() => { 
+        drawFromSteps(steps);
+        if (steps.length) {
+          VPT.setGuideNote(steps[0].midi);
+          VPT.drawGraph(lastMidis, lastBeats);
+        }
+      }, `+${when}`);
 
       for (const st of steps) {
         const dur = VPT.durToSeconds(st.durStr);
+
+        // перед каждой нотой двигаем guide
+        Tone.Transport.schedule(() => {
+          VPT.setGuideNote(st.midi);
+          VPT.drawGraph(lastMidis, lastBeats);
+        }, `+${when}`);
+
         Tone.Transport.schedule((t) => {
           VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
         }, `+${when}`);
+
         when += dur;
       }
 
@@ -224,71 +267,56 @@
   function next() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-  
-    // всегда стопаем всё перед переключением
     if (isPlaying) stop();
     VPT.examples.stop();
-  
     selectIndex((currentIndex + 1) % total);
   }
-  
+
   function prev() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-  
-    // всегда стопаем всё перед переключением
     if (isPlaying) stop();
     VPT.examples.stop();
-  
     selectIndex((currentIndex - 1 + total) % total);
   }
-  
 
-  // init
+  // ---------- init ----------
   fillNoteSelect(els.startNote, "A2");
   fillNoteSelect(els.lowerNote, "A2");
-  fillNoteSelect(els.upperNote, "G4");
+  fillNoteSelect(els.upperNote, "A4");
   renderExerciseList();
   selectIndex(0);
 
   els.btnPlayStop.addEventListener("click", () => (isPlaying ? stop() : play()));
   els.btnNext.addEventListener("click", next);
   els.btnPrev.addEventListener("click", prev);
-  
-  // открыть модалку
+
+  // модалка
   els.btnSettings.addEventListener("click", () => {
     els.settingsModal.classList.remove("hidden");
     els.settingsModal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
   });
-  
-  // функция закрытия
   function closeSettingsModal(){
     els.settingsModal.classList.add("hidden");
     els.settingsModal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
     if (!isPlaying) updatePreview();
   }
-  
-  // кнопка "Закрыть"
   els.btnCloseSettings.addEventListener("click", closeSettingsModal);
-  
-  // клик по подложке
   els.settingsModal.addEventListener("click", (e) => {
     if (e.target === els.settingsModal) closeSettingsModal();
   });
-  
-  // Esc
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !els.settingsModal.classList.contains("hidden")) {
       closeSettingsModal();
     }
   });
-  
 
+  // обновляем предпросмотр только когда не играем
   [els.bpm, els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
     .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
 
-  // ресайз окна — пересчитать масштаб X и перерисовать график
+  // пересчёт ширины на ресайз (поддерживаем «вмещается без скролла»)
   window.addEventListener('resize', () => { if (!isPlaying) updatePreview(); });
 })();

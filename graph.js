@@ -1,103 +1,229 @@
-window.VPT = window.VPT || {};
+// graph.js — устойчивый график + две накладки: Guide (оранжевая) и Live (зелёная)
 
-VPT.drawGraph = function(steps, svgEl) {
-  if (!steps || !steps.length) { svgEl.innerHTML = ""; return; }
+(function () {
+  const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
-  // Геометрия
-  const height = 260;
-  const gutterY = 10;
-  const yUsable = height - gutterY * 2;
-  const leftGutter = 64;              // левое поле под подписи нот
+  function midiToNote(m) {
+    const mm = Math.round(m);
+    const name = NOTE_NAMES[((mm % 12) + 12) % 12];
+    const oct = Math.floor(mm / 12) - 1;
+    return name + oct;
+  }
+  function noteNameToMidi(name) {
+    if (typeof name === "number") return (Number.isFinite(name) ? name|0 : 57);
+    const s = String(name || "").trim().replace("♯","#").replace("♭","b");
+    const m = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(s);
+    if (!m) return 57;
+    let nn = m[1].toUpperCase() + (m[2] || "");
+    const flats = { "Cb":"B","Db":"C#","Eb":"D#","Fb":"E","Gb":"F#","Ab":"G#","Bb":"A#" };
+    if (nn.endsWith("b")) nn = flats[nn] || nn;
+    const idx = NOTE_NAMES.indexOf(nn);
+    if (idx < 0) return 57;
+    return idx + (parseInt(m[3],10)+1)*12;
+  }
 
-  // общая длительность в «долях» (beats), нужна и для масштаба X, и для вертикальных линий
-  const totalBeats = steps.reduce((a, s) => a + (s.beats || 0.5), 0);
+  // freq -> midi & cents
+  function freqToMidi(f) {
+    if (!Number.isFinite(f) || f <= 0) return null;
+    const m = 69 + 12 * Math.log2(f / 440);
+    const mRound = Math.round(m);
+    const cents = Math.round((m - mRound) * 100);
+    return { midi: m, midiRound: mRound, cents };
+  }
 
-  // Ширина контейнера — делаем график без горизонтального скролла
-  const containerW = svgEl.parentElement.getBoundingClientRect().width || 900;
-  const width = Math.max(containerW, 300);   // минимальная ширина, если контейнер очень узкий
-  const xUsable = Math.max(1, width - leftGutter);
-  const pxPerBeat = xUsable / Math.max(0.001, totalBeats);
+  const VPT = (window.VPT = window.VPT || {});
+  VPT.NOTE_NAMES = NOTE_NAMES;
+  VPT.noteNameToMidi = noteNameToMidi;
+  VPT.noteToMidiSafe = noteNameToMidi;
+  VPT.midiToNote = midiToNote;
 
-  // Ноты по Y
-  const midis = steps.map(s => s.midi);
-  const minMidi = Math.min(...midis);
-  const maxMidi = Math.max(...midis);
-  const yForMidi = (m) => {
-    const norm = (m - minMidi) / Math.max(1, (maxMidi - minMidi));
-    return height - (norm * yUsable + gutterY);
+  const els = {
+    svg: document.getElementById("svg"),
+    noteList: document.getElementById("noteList"),
   };
 
-  // Подготовка SVG
-  svgEl.setAttribute('width', width);
-  svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svgEl.innerHTML = '';
+  // оформление
+  const GUTTER = 64;
+  const MIN_CONTENT_W = 600;
+  const HEIGHT = 260;
+  const GRID = "#334155";
+  const PATH = "#38bdf8";
 
-  // Фон
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x', '0'); bg.setAttribute('y', '0');
-  bg.setAttribute('width', width); bg.setAttribute('height', height);
-  bg.setAttribute('fill', '#0f172a'); svgEl.appendChild(bg);
+  // состояние последней полной отрисовки графика (нужно, чтобы быстро рисовать оверлеи)
+  let scale = {
+    minMidi: null, maxMidi: null, width: 0, height: HEIGHT, gutter: GUTTER,
+  };
+  let lastMidis = [];
+  let lastBeats = [];
 
-  // Разделитель слева
-  const sep = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-  sep.setAttribute('x1', leftGutter); sep.setAttribute('x2', leftGutter);
-  sep.setAttribute('y1', 0); sep.setAttribute('y2', height);
-  sep.setAttribute('stroke', '#334155'); sep.setAttribute('stroke-width', '1');
-  svgEl.appendChild(sep);
+  // состояния оверлеев
+  let guideMidi = null;         // фиксированная «целевая» линия (оранжевая)
+  let liveHz = null;            // текущая частота (из питч-тракера)
+  let liveMidiCache = null;     // кеш перерасчета частоты
 
-  // Горизонтальные линии + подписи нот (уникальные высоты)
-  const uniqMidis = [...new Set(midis)].sort((a, b) => b - a);
-  for (const m of uniqMidis) {
-    const y = yForMidi(m);
-    const gl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    gl.setAttribute('x1', leftGutter); gl.setAttribute('x2', width);
-    gl.setAttribute('y1', y); gl.setAttribute('y2', y);
-    gl.setAttribute('stroke', '#334155'); gl.setAttribute('stroke-dasharray', '4 6');
-    svgEl.appendChild(gl);
+  VPT.setGuideNote = function (note) {
+    guideMidi = (note == null || note === "")
+      ? null
+      : (typeof note === "number" ? note : noteNameToMidi(note));
+    paintOverlays(); // перерисуем только оверлеи
+  };
 
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', leftGutter - 10); label.setAttribute('y', y + 4);
-    label.setAttribute('fill', '#94a3b8'); label.setAttribute('font-size', '11');
-    label.setAttribute('text-anchor', 'end');
-    label.textContent = VPT.midiToNote(m); svgEl.appendChild(label);
-  }
+  // Подавай сюда частоту (Гц) — зелёная линия появится/обновится
+  VPT.setLivePitch = function (hzOrNull) {
+    liveHz = (Number.isFinite(hzOrNull) && hzOrNull > 0) ? hzOrNull : null;
+    paintOverlays(); // только оверлеи
+  };
 
-  // Вертикальные линии долей/тактов по X
-  // Считаем целые биты и ставим сетку с подписями 1,2,3...
-  const beatCount = Math.max(1, Math.ceil(totalBeats));
-  for (let b = 0; b <= beatCount; b++) {
-    const x = leftGutter + b * pxPerBeat;
-    const vl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    vl.setAttribute('x1', x); vl.setAttribute('x2', x);
-    vl.setAttribute('y1', 0); vl.setAttribute('y2', height);
-    vl.setAttribute('stroke', '#1f2a3a'); vl.setAttribute('stroke-dasharray', '2 8');
-    svgEl.appendChild(vl);
+  // Главный рендер графика
+  VPT.drawGraph = function drawGraph(midiSeq, beatDurations, opts = {}) {
+    const svg = els.svg;
+    if (!svg) return;
 
-    if (b > 0) {
-      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      txt.setAttribute('x', x + 4); txt.setAttribute('y', 14);
-      txt.setAttribute('fill', '#94a3b8'); txt.setAttribute('font-size', '10');
-      txt.textContent = String(b); svgEl.appendChild(txt);
+    // запомним «последний график»
+    lastMidis = Array.isArray(midiSeq) ? midiSeq.filter(Number.isFinite) : [];
+    lastBeats = (Array.isArray(beatDurations) && beatDurations.length === lastMidis.length)
+      ? beatDurations.map(b => (Number.isFinite(b) ? Math.max(0.0001,b) : 0.5))
+      : lastMidis.map(() => 0.5);
+
+    const pxPerBeat = Number.isFinite(opts.pxPerBeat) ? opts.pxPerBeat : 80;
+    const totalBeats = lastBeats.reduce((a,b)=>a+b, 0) || 4;
+    const contentW = Math.max(MIN_CONTENT_W, Math.ceil(totalBeats * pxPerBeat));
+    const width = GUTTER + contentW;
+
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("viewBox", `0 0 ${width} ${HEIGHT}`);
+    svg.innerHTML = "";
+
+    // если данных нет — только фон
+    if (!lastMidis.length) {
+      baseBg(svg, width);
+      scale = { minMidi: 57, maxMidi: 69, width, height: HEIGHT, gutter: GUTTER };
+      paintOverlays();
+      return;
     }
-  }
 
-  // Линия мелодии (прямоугольными участками по длительностям)
-  let x = leftGutter;
-  let d = `M${x},${yForMidi(steps[0].midi)}`;
-  for (let i = 0; i < steps.length; i++) {
-    const w = (steps[i].beats || 0.5) * pxPerBeat;
-    const y = yForMidi(steps[i].midi);
-    d += `L${x + w},${y}`;  // горизонтальный отрезок (длительность ноты)
-    x += w;
-    if (i < steps.length - 1) {
-      d += `L${x},${yForMidi(steps[i + 1].midi)}`; // вертикальный переход к следующей ноте
+    // диапазон по Y — учитываем guide/live (чтобы всегда были видны)
+    const yPool = lastMidis.slice();
+    if (Number.isFinite(guideMidi)) yPool.push(guideMidi);
+    if (Number.isFinite(liveHz)) {
+      const fm = freqToMidi(liveHz);
+      if (fm) yPool.push(fm.midi);
     }
+    const minMidi = Math.min(...yPool);
+    const maxMidi = Math.max(...yPool);
+
+    baseBg(svg, width);
+
+    // горизонтальные линии и подписи
+    const uniq = [...new Set(yPool.map(v => Math.round(v)))].sort((a,b)=>b-a);
+    const yForMidi = makeY(minMidi, maxMidi);
+    for (const m of uniq) {
+      const y = yForMidi(m);
+      line(svg, GUTTER, width, y, y, GRID, "4 6"); // grid
+      text(svg, GUTTER-10, y+4, "#94a3b8", 11, "end", midiToNote(m));
+    }
+
+    // кривая паттерна
+    let x = GUTTER;
+    let d = `M${x},${yForMidi(lastMidis[0])}`;
+    for (let i = 0; i < lastMidis.length; i++) {
+      const w = lastBeats[i] * pxPerBeat;
+      const y = yForMidi(lastMidis[i]);
+      d += ` L${(x + w).toFixed(2)},${y.toFixed(2)}`;
+      x += w;
+      if (i < lastMidis.length - 1) {
+        const yNext = yForMidi(lastMidis[i+1]);
+        d += ` L${x.toFixed(2)},${yNext.toFixed(2)}`;
+      }
+    }
+    path(svg, d, PATH, 3);
+
+    // сохранить масштаб для оверлеев
+    scale = { minMidi, maxMidi, width, height: HEIGHT, gutter: GUTTER };
+
+    // оверлеи
+    paintOverlays();
+    // список нот (если нужен)
+    if (els.noteList) els.noteList.textContent = lastMidis.map(m => midiToNote(m)).join(" · ");
+  };
+
+  // ---------- внутренние утилиты рендера ----------
+  function baseBg(svg, width) {
+    rect(svg, 0,0, width, HEIGHT, "#0f172a");
+    line(svg, GUTTER, GUTTER, 0, HEIGHT, GRID);
+  }
+  function makeY(minMidi, maxMidi) {
+    const pad = 10;
+    const usable = HEIGHT - pad*2;
+    const denom = Math.max(1, (maxMidi - minMidi));
+    return (m) => {
+      const norm = (m - minMidi) / denom;
+      return HEIGHT - (norm * usable + pad);
+    };
+  }
+  function rect(svg, x,y,w,h, fill) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    el.setAttribute("x",x); el.setAttribute("y",y);
+    el.setAttribute("width",w); el.setAttribute("height",h);
+    el.setAttribute("fill", fill); svg.appendChild(el);
+  }
+  function line(svg, x1,x2,y1,y2, stroke, dash) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg","line");
+    el.setAttribute("x1",x1); el.setAttribute("x2",x2);
+    el.setAttribute("y1",y1); el.setAttribute("y2",y2);
+    el.setAttribute("stroke", stroke);
+    if (dash) el.setAttribute("stroke-dasharray", dash);
+    svg.appendChild(el);
+  }
+  function text(svg, x,y, fill, fs, anchor, content) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg","text");
+    el.setAttribute("x", x); el.setAttribute("y", y);
+    el.setAttribute("fill", fill); el.setAttribute("font-size", String(fs));
+    el.setAttribute("text-anchor", anchor);
+    el.textContent = content;
+    svg.appendChild(el);
+  }
+  function path(svg, d, stroke, sw) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg","path");
+    el.setAttribute("d", d.trim());
+    el.setAttribute("fill", "none");
+    el.setAttribute("stroke", stroke);
+    el.setAttribute("stroke-width", String(sw));
+    svg.appendChild(el);
   }
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', d.trim());
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', '#38bdf8');
-  path.setAttribute('stroke-width', '3');
-  svgEl.appendChild(path);
-};
+  // ---------- оверлеи (рисуем поверх без очистки основного графика) ----------
+  function paintOverlays() {
+    const svg = els.svg;
+    if (!svg || scale.minMidi == null) return;
+
+    // удалить старый слой
+    const old = svg.querySelector("#vpt-overlays");
+    if (old) old.remove();
+
+    const yFor = makeY(scale.minMidi, scale.maxMidi);
+    const layer = document.createElementNS("http://www.w3.org/2000/svg","g");
+    layer.setAttribute("id","vpt-overlays");
+
+    // Guide (оранжевая)
+    if (Number.isFinite(guideMidi)) {
+      const yG = yFor(guideMidi);
+      line(layer, scale.gutter, scale.width, yG, yG, "#f59e0b", "6 6");
+      text(layer, scale.gutter - 10, yG - 6, "#f59e0b", 11, "end", `Guide: ${midiToNote(guideMidi)}`);
+    }
+
+    // Live (зелёная) — из частоты
+    if (Number.isFinite(liveHz)) {
+      const fm = freqToMidi(liveHz);
+      if (fm) {
+        liveMidiCache = fm;
+        const yL = yFor(fm.midi);
+        line(layer, scale.gutter, scale.width, yL, yL, "#10b981", "3 3");
+        const label = `Live: ${midiToNote(fm.midiRound)} (${fm.cents >= 0 ? "+" : ""}${fm.cents}¢)`;
+        text(layer, scale.gutter - 10, yL - 6, "#10b981", 11, "end", label);
+      }
+    }
+
+    svg.appendChild(layer);
+  }
+})();

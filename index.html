@@ -77,6 +77,23 @@
         </select>
       </label>
 
+      <label class="label">
+        <input id="playPrelude" type="checkbox" checked />
+        Прелюдия перед началом / каждым блоком: стартовая нота → мажорное трезвучие
+      </label>
+      
+      <label class="label">Длительность стартовой ноты (мс)
+        <input id="preludeRootMs" type="number" min="100" max="3000" value="350"/>
+      </label>
+      
+      <label class="label">Длительность трезвучия (мс)
+        <input id="triadMs" type="number" min="100" max="3000" value="600"/>
+      </label>
+      
+      <label class="label">Пауза на вдох между повторами (мс)
+        <input id="breathMs" type="number" min="0" max="8000" value="100"/>
+      </label>
+      
       <label class="label">Пауза на вдох между повторами (мс)
         <input id="breathMs" type="number" min="0" max="8000" value="800"/>
       </label>

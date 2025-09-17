@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vocal-trainer-v21';
+const CACHE_NAME = 'vocal-trainer-v23';
 
 const ASSETS = [
   './',

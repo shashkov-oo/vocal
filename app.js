@@ -20,6 +20,10 @@
     lowerNote: document.getElementById("lowerNote"),
     upperNote: document.getElementById("upperNote"),
     noteDur: document.getElementById("noteDur"),
+    playTriad: document.getElementById("playTriad"),
+    triadMs: document.getElementById("triadMs"),
+    playPrelude: document.getElementById("playPrelude"),
+    preludeRootMs: document.getElementById("preludeRootMs"),
     breathMs: document.getElementById("breathMs"),
   };
 
@@ -156,6 +160,22 @@
 
   function updatePreview() { selectIndex(currentIndex); }
 
+// ---- прелюдия: стартовая нота → трезвучие (мажор) ----
+function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
+  const s = VPT.audio.get();
+  const rootNote = VPT.midiToNote(rootMidi);
+  const triadNotes = [rootMidi, rootMidi+4, rootMidi+7].map(VPT.midiToNote);
+  // стартовая нота
+  Tone.Transport.schedule((t) => {
+    try { s.triggerAttackRelease(rootNote, rootSec, t, velocity); } catch(_) {}
+  }, `+${whenSec}`);
+  // трезвучие сразу после ноты
+  Tone.Transport.schedule((t) => {
+    try { for (const n of triadNotes) s.triggerAttackRelease(n, triadSec, t, velocity*0.95); } catch(_) {}
+  }, `+${whenSec + rootSec}`);
+  return whenSec + rootSec + triadSec; // вернуть новое "when"
+}
+
   // ---------- транспорт ----------
   async function play() {
     const patObj = patternByIndex(currentIndex)?.obj;
@@ -182,6 +202,11 @@
     const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
     const upper      = VPT.noteToMidiSafe(els.upperNote.value || "A4");
+    const playTriad  = !!els.playTriad?.checked;
+    const playPrelude = !!els.playPrelude?.checked;
+    const rootSec     = Math.max(0.1, (parseInt(els.preludeRootMs?.value || "350", 10) || 0) / 1000);
+    const triadSec    = Math.max(0.1, (parseInt(els.triadMs?.value || "600", 10) || 0) / 1000);
+
     const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
 
     if (mode === "single") {
@@ -189,6 +214,14 @@
       drawFromSteps(steps);
 
       let when = 0;
+      // аккорд перед началом
+      if (playTriad && triadSec > 0) {
+        scheduleTriad(when, startMidi, triadSec);
+        when += triadSec;
+      }
+      if (playPrelude) {
+        when = schedulePrelude(when, startMidi, rootSec, triadSec);
+      }
       for (const st of steps) {
         const dur = VPT.durToSeconds(st.durStr);
 
@@ -220,6 +253,17 @@
     for (let idx = 0; idx < roots.length; idx++) {
       const root = roots[idx];
       const steps = VPT.buildStepsForRoot(root, defaultDur, patObj);
+
+      // аккорд перед блоком
+    if (playTriad && triadSec > 0) {
+      scheduleTriad(when, root, triadSec);
+      when += triadSec;
+    }
+    
+    if (playPrelude) {
+      when = schedulePrelude(when, root, rootSec, triadSec);
+    }
+
 
       // перерисовываем график под новый блок
       Tone.Transport.schedule(() => { 
@@ -313,7 +357,8 @@
   });
 
   // обновляем предпросмотр только когда не играем
-  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
+  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur,
+    els.playPrelude, els.preludeRootMs, els.triadMs, els.breathMs]
     .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
 
   // пересчёт ширины на ресайз (поддерживаем «вмещается без скролла»)

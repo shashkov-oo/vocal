@@ -15,7 +15,6 @@
     btnCloseSettings: document.getElementById("btnCloseSettings"),
 
     // controls
-    bpm: document.getElementById("bpm"),
     runMode: document.getElementById("runMode"),      // 'single' | 'range'
     startNote: document.getElementById("startNote"),
     lowerNote: document.getElementById("lowerNote"),
@@ -175,7 +174,7 @@
       await Tone.start();
     } catch(e) { console.error("Audio load error", e); }
 
-    Tone.Transport.bpm.value = parseInt(els.bpm.value || "90", 10);
+    Tone.Transport.bpm.value = parseInt(patObj.bpm || 90, 10);
     VPT.audio.stop();
 
     const mode       = els.runMode.value;          // 'single' | 'range'
@@ -314,7 +313,7 @@
   });
 
   // обновляем предпросмотр только когда не играем
-  [els.bpm, els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
+  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
     .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
 
   // пересчёт ширины на ресайз (поддерживаем «вмещается без скролла»)

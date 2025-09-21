@@ -100,10 +100,12 @@ VPT.PATTERNS = [
   },
   { id:"15", name:"15 у-ы закрытый рот", bpm:90, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
+    microPause:{ every:3, ms:100 },
     data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40"
   },
   { id:"16", name:"16 ууу-ууу-ууу-ууу-у", bpm:90, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
+    microPause:{ every:3, ms:100 },
     data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40"
   },
   { id:"17", name:"17 хм-м-м-м закрытый рот", bpm:110, type:"semitone",

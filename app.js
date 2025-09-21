@@ -1,4 +1,4 @@
-// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание + прелюдии
+// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание + прелюдии + микропаузи
 (function () {
   const els = {
     exerciseList: document.getElementById("exerciseList"),
@@ -14,7 +14,7 @@
     settingsModal: document.getElementById("settingsModal"),
     btnCloseSettings: document.getElementById("btnCloseSettings"),
 
-    // controls (без глобального BPM)
+    // controls
     runMode: document.getElementById("runMode"),      // 'single' | 'range'
     startNote: document.getElementById("startNote"),
     lowerNote: document.getElementById("lowerNote"),
@@ -26,7 +26,7 @@
   let currentIndex = 0;
   let isPlaying = false;
 
-  // для перерисовки графика «мгновенно» при смещении guide
+  // для перерисовки графика мгновенно при смещении guide
   let lastMidis = [];
   let lastBeats = [];
 
@@ -129,8 +129,37 @@
     VPT.drawGraph(lastMidis, lastBeats);
   }
 
+  // Вставляет "тихие" шаги-паузы после каждой N-й звучащей ноты.
+  // rest-шага нет звука, но он двигает таймлайн и график по X.
+  function injectMicroPauses(steps, rule, bpm) {
+    if (!rule || !rule.every || !rule.ms) return steps;
+    const every = Math.max(1, rule.every|0);
+    const gapSec = Math.max(0, rule.ms) / 1000;
+    const secPerBeat = 60 / (parseFloat(bpm) || 90);
+
+    const out = [];
+    let countNotes = 0;
+    for (let i = 0; i < steps.length; i++) {
+      const st = steps[i];
+      out.push(st);
+      countNotes++;
+
+      // если это каждая N-я нота — вставим микропаузу (rest)
+      if (countNotes % every === 0 && gapSec > 0) {
+        out.push({
+          midi: st.midi,           // для графика — горизонтальный отрезок
+          durStr: null,            // не используем VPT.durToSeconds
+          durSec: gapSec,          // работаем напрямую в секундах
+          beats: gapSec / secPerBeat,
+          rest: true
+        });
+      }
+    }
+    return out;
+  }
+
   function selectIndex(i) {
-    // при переключении всегда стопаем всё
+    // стопаем всё при переключении
     if (isPlaying) stop();
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
@@ -144,12 +173,14 @@
     loadDescription(res.obj.id, res.obj.desc);
 
     const root = VPT.noteToMidiSafe(els.startNote.value || "A2");
-    const steps = VPT.buildStepsForRoot(root, els.noteDur.value, res.obj);
+    const baseSteps = VPT.buildStepsForRoot(root, els.noteDur.value, res.obj);
+    const steps = injectMicroPauses(baseSteps, res.obj.microPause, res.obj.bpm);
 
     drawFromSteps(steps);
-    // «оранжевая» линия — на первый шаг паттерна
     if (steps.length) {
-      VPT.setGuideNote(steps[0].midi);
+      // ставим guide на первую звучащую ноту (rest-шаги пропускаем)
+      const firstSound = steps.find(s => !s.rest) || steps[0];
+      VPT.setGuideNote(firstSound.midi);
       VPT.drawGraph(lastMidis, lastBeats);
     }
   }
@@ -157,7 +188,7 @@
   function updatePreview() { selectIndex(currentIndex); }
 
   // ---- прелюдия: варианты входа перед блоком ----
-  // mode: 'root_triad' | 'playSecond'
+  // mode: 'root_triad' | 'dom5_tonic_triad'
   function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, mode='root_triad', velocity=0.8) {
     const s = VPT.audio.get();
     const N = (m)=>VPT.midiToNote(m);
@@ -166,22 +197,22 @@
       Tone.Transport.schedule((t)=>{ try{ s.triggerAttackRelease(N(m), dur, t, velocity); }catch(_){} }, `+${t0}`);
       return t0 + dur;
     };
-    const playChord = (m12, dur, t0)=> {
-      const triad = [m12, m12+4, m12+7, , m12+12];
+    const playTriad = (m12, dur, t0)=> {
+      const triad = [m12, m12+4, m12+7];
       Tone.Transport.schedule((t)=>{ try{ triad.forEach(n=>s.triggerAttackRelease(N(n), dur, t, velocity*0.95)); }catch(_){} }, `+${t0}`);
       return t0 + dur;
     };
 
     let t = whenSec;
-    if (mode === 'playSecond') {
+    if (mode === 'dom5_tonic_triad') {
       // +19 → +12 → (12,16,19)
-      t = playNote(rootMidi+7, rootSec, t);
-      t = playNote(rootMidi+0, rootSec, t);
-      t = playChord(rootMidi+0, triadSec, t);
+      t = playNote(rootMidi+19, rootSec, t);
+      t = playNote(rootMidi+12, rootSec, t);
+      t = playTriad(rootMidi+12, triadSec, t);
     } else {
       // стартовая нота → трезвучие от корня
       t = playNote(rootMidi, rootSec, t);
-      t = playChord(rootMidi, triadSec, t);
+      t = playTriad(rootMidi, triadSec, t);
     }
     return t; // вернуть новое "when"
   }
@@ -223,7 +254,8 @@
     const preTriadSec    = Math.max(0.1, ((pre.triadMs ?? 600) / 1000));
 
     if (mode === "single") {
-      const steps = VPT.buildStepsForRoot(startMidi, defaultDur, patObj);
+      const baseSteps = VPT.buildStepsForRoot(startMidi, defaultDur, patObj);
+      const steps = injectMicroPauses(baseSteps, patObj.microPause, patObj.bpm);
       drawFromSteps(steps);
 
       let when = 0;
@@ -234,17 +266,19 @@
       }
 
       for (const st of steps) {
-        const dur = VPT.durToSeconds(st.durStr);
+        const dur = (st.durSec != null) ? st.durSec : VPT.durToSeconds(st.durStr);
 
-        // перед стартом шага двигаем guide и перерисовываем график
-        Tone.Transport.schedule(() => {
-          VPT.setGuideNote(st.midi);
-          VPT.drawGraph(lastMidis, lastBeats);
-        }, `+${when}`);
+        // guide и звук — только для звучащих шагов
+        if (!st.rest) {
+          Tone.Transport.schedule(() => {
+            VPT.setGuideNote(st.midi);
+            VPT.drawGraph(lastMidis, lastBeats);
+          }, `+${when}`);
 
-        Tone.Transport.schedule((t) => {
-          VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
-        }, `+${when}`);
+          Tone.Transport.schedule((t) => {
+            VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
+          }, `+${when}`);
+        }
 
         when += dur;
       }
@@ -263,7 +297,8 @@
     let when = 0;
     for (let idx = 0; idx < roots.length; idx++) {
       const root = roots[idx];
-      const steps = VPT.buildStepsForRoot(root, defaultDur, patObj);
+      const baseSteps = VPT.buildStepsForRoot(root, defaultDur, patObj);
+      const steps = injectMicroPauses(baseSteps, patObj.microPause, patObj.bpm);
 
       // прелюдия перед блоком
       if (preludeEnabled) {
@@ -274,23 +309,26 @@
       Tone.Transport.schedule(() => { 
         drawFromSteps(steps);
         if (steps.length) {
-          VPT.setGuideNote(steps[0].midi);
+          const firstSound = steps.find(s => !s.rest) || steps[0];
+          VPT.setGuideNote(firstSound.midi);
           VPT.drawGraph(lastMidis, lastBeats);
         }
       }, `+${when}`);
 
       for (const st of steps) {
-        const dur = VPT.durToSeconds(st.durStr);
+        const dur = (st.durSec != null) ? st.durSec : VPT.durToSeconds(st.durStr);
 
-        // перед каждой нотой двигаем guide
-        Tone.Transport.schedule(() => {
-          VPT.setGuideNote(st.midi);
-          VPT.drawGraph(lastMidis, lastBeats);
-        }, `+${when}`);
+        // перед каждой нотой двигаем guide и играем звук, rest — тишина
+        if (!st.rest) {
+          Tone.Transport.schedule(() => {
+            VPT.setGuideNote(st.midi);
+            VPT.drawGraph(lastMidis, lastBeats);
+          }, `+${when}`);
 
-        Tone.Transport.schedule((t) => {
-          VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
-        }, `+${when}`);
+          Tone.Transport.schedule((t) => {
+            VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
+          }, `+${when}`);
+        }
 
         when += dur;
       }

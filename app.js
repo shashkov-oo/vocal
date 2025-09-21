@@ -1,4 +1,4 @@
-// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание
+// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание + прелюдии
 (function () {
   const els = {
     exerciseList: document.getElementById("exerciseList"),
@@ -14,16 +14,12 @@
     settingsModal: document.getElementById("settingsModal"),
     btnCloseSettings: document.getElementById("btnCloseSettings"),
 
-    // controls
+    // controls (без глобального BPM)
     runMode: document.getElementById("runMode"),      // 'single' | 'range'
     startNote: document.getElementById("startNote"),
     lowerNote: document.getElementById("lowerNote"),
     upperNote: document.getElementById("upperNote"),
     noteDur: document.getElementById("noteDur"),
-    playTriad: document.getElementById("playTriad"),
-    triadMs: document.getElementById("triadMs"),
-    playPrelude: document.getElementById("playPrelude"),
-    preludeRootMs: document.getElementById("preludeRootMs"),
     breathMs: document.getElementById("breathMs"),
   };
 
@@ -160,21 +156,35 @@
 
   function updatePreview() { selectIndex(currentIndex); }
 
-// ---- прелюдия: стартовая нота → трезвучие (мажор) ----
-function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
-  const s = VPT.audio.get();
-  const rootNote = VPT.midiToNote(rootMidi);
-  const triadNotes = [rootMidi, rootMidi+4, rootMidi+7].map(VPT.midiToNote);
-  // стартовая нота
-  Tone.Transport.schedule((t) => {
-    try { s.triggerAttackRelease(rootNote, rootSec, t, velocity); } catch(_) {}
-  }, `+${whenSec}`);
-  // трезвучие сразу после ноты
-  Tone.Transport.schedule((t) => {
-    try { for (const n of triadNotes) s.triggerAttackRelease(n, triadSec, t, velocity*0.95); } catch(_) {}
-  }, `+${whenSec + rootSec}`);
-  return whenSec + rootSec + triadSec; // вернуть новое "when"
-}
+  // ---- прелюдия: варианты входа перед блоком ----
+  // mode: 'root_triad' | 'playSecond'
+  function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, mode='root_triad', velocity=0.8) {
+    const s = VPT.audio.get();
+    const N = (m)=>VPT.midiToNote(m);
+
+    const playNote = (m, dur, t0)=> {
+      Tone.Transport.schedule((t)=>{ try{ s.triggerAttackRelease(N(m), dur, t, velocity); }catch(_){} }, `+${t0}`);
+      return t0 + dur;
+    };
+    const playChord = (m12, dur, t0)=> {
+      const triad = [m12, m12+4, m12+7, , m12+12];
+      Tone.Transport.schedule((t)=>{ try{ triad.forEach(n=>s.triggerAttackRelease(N(n), dur, t, velocity*0.95)); }catch(_){} }, `+${t0}`);
+      return t0 + dur;
+    };
+
+    let t = whenSec;
+    if (mode === 'playSecond') {
+      // +19 → +12 → (12,16,19)
+      t = playNote(rootMidi+7, rootSec, t);
+      t = playNote(rootMidi+0, rootSec, t);
+      t = playChord(rootMidi+0, triadSec, t);
+    } else {
+      // стартовая нота → трезвучие от корня
+      t = playNote(rootMidi, rootSec, t);
+      t = playChord(rootMidi, triadSec, t);
+    }
+    return t; // вернуть новое "when"
+  }
 
   // ---------- транспорт ----------
   async function play() {
@@ -194,6 +204,7 @@ function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
       await Tone.start();
     } catch(e) { console.error("Audio load error", e); }
 
+    // Темп берём из упражнения (fallback 90)
     Tone.Transport.bpm.value = parseInt(patObj.bpm || 90, 10);
     VPT.audio.stop();
 
@@ -202,26 +213,26 @@ function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
     const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
     const upper      = VPT.noteToMidiSafe(els.upperNote.value || "A4");
-    const playTriad  = !!els.playTriad?.checked;
-    const playPrelude = !!els.playPrelude?.checked;
-    const rootSec     = Math.max(0.1, (parseInt(els.preludeRootMs?.value || "350", 10) || 0) / 1000);
-    const triadSec    = Math.max(0.1, (parseInt(els.triadMs?.value || "600", 10) || 0) / 1000);
-
     const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
+
+    // параметры прелюдии из упражнения
+    const pre = patObj.prelude || {};
+    const preludeEnabled = !!pre.enabled;
+    const preludeMode    = pre.mode || 'root_triad';
+    const preRootSec     = Math.max(0.1, ((pre.rootMs ?? 350) / 1000));
+    const preTriadSec    = Math.max(0.1, ((pre.triadMs ?? 600) / 1000));
 
     if (mode === "single") {
       const steps = VPT.buildStepsForRoot(startMidi, defaultDur, patObj);
       drawFromSteps(steps);
 
       let when = 0;
-      // аккорд перед началом
-      if (playTriad && triadSec > 0) {
-        scheduleTriad(when, startMidi, triadSec);
-        when += triadSec;
+
+      // прелюдия: перед началом
+      if (preludeEnabled) {
+        when = schedulePrelude(when, startMidi, preRootSec, preTriadSec, preludeMode);
       }
-      if (playPrelude) {
-        when = schedulePrelude(when, startMidi, rootSec, triadSec);
-      }
+
       for (const st of steps) {
         const dur = VPT.durToSeconds(st.durStr);
 
@@ -254,16 +265,10 @@ function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
       const root = roots[idx];
       const steps = VPT.buildStepsForRoot(root, defaultDur, patObj);
 
-      // аккорд перед блоком
-    if (playTriad && triadSec > 0) {
-      scheduleTriad(when, root, triadSec);
-      when += triadSec;
-    }
-    
-    if (playPrelude) {
-      when = schedulePrelude(when, root, rootSec, triadSec);
-    }
-
+      // прелюдия перед блоком
+      if (preludeEnabled) {
+        when = schedulePrelude(when, root, preRootSec, preTriadSec, preludeMode);
+      }
 
       // перерисовываем график под новый блок
       Tone.Transport.schedule(() => { 
@@ -357,8 +362,7 @@ function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, velocity=0.8) {
   });
 
   // обновляем предпросмотр только когда не играем
-  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur,
-    els.playPrelude, els.preludeRootMs, els.triadMs, els.breathMs]
+  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
     .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
 
   // пересчёт ширины на ресайз (поддерживаем «вмещается без скролла»)

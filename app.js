@@ -23,6 +23,24 @@
     breathMs: document.getElementById("breathMs"),
   };
 
+  const DEFAULT_NOTE_DURATION = "8n"; // что было по умолчанию раньше
+
+  function resolveNoteDuration(pattern, step) {
+    // 1) приоритет у локальной длительности ноты
+    if (step && typeof step === "object" && step.dur) return step.dur;
+  
+    // 2) глобальная длительность всего упражнения (музыкальная)
+    if (pattern && pattern.noteDuration) return pattern.noteDuration;
+  
+    // 3) глобальная длительность в миллисекундах
+    if (pattern && typeof pattern.noteDurationMs === "number") {
+      return pattern.noteDurationMs / 1000; // Tone.js понимает число как секунды
+    }
+  
+    // 4) дефолт
+    return DEFAULT_NOTE_DURATION;
+  }
+
   let currentIndex = 0;
   let isPlaying = false;
 
@@ -244,7 +262,8 @@
     const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
     const upper      = VPT.noteToMidiSafe(els.upperNote.value || "A4");
-    const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
+    //const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
+    const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "0", 10) || 0) / 1000);
 
     // параметры прелюдии из упражнения
     const pre = patObj.prelude || {};

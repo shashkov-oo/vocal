@@ -49,104 +49,119 @@ VPT.durToBeats = function(s){
 
 /** Описание паттернов (поддержка пер-нотных dur и repeat) + прелюдии */
 VPT.PATTERNS = [
-  { id:"1",  name:"1 трель (губами бр)", bpm:150, type:"semitone",
+  { id:"1",  name:"пассаж губами", bpm:150, type:"semitone",
+    noteDuration:"8n",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0],
-    desc:"Следите за тем, чтобы пальцы оставались на щеках. Губы должны двигаться легко и равномерно..."
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}]
   },
-  { id:"2",  name:"2 трель (языком р)", bpm:120, type:"semitone",
+  { id:"2",  name:"трель (языком р)", bpm:120, type:"semitone",
+    noteDuration:"8n",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"2 3:30"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}]
   },
-  { id:"3",  name:"3 трель (губами бр) скачки", bpm:150, type:"semitone",
+  { id:"3",  name:"пассаж губами", bpm:150, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,7,4,12,7,4,0], desc:"3 7:20"
+    noteDuration:"8n",
+    data:[0,7,4,12,7,4,{d:0, dur:"2n"}]
   },
-  { id:"4",  name:"4 трель (языком р) скачки", bpm:120, type:"semitone",
+  { id:"4",  name:"трель языком", bpm:120, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,7,4,12,7,4,0], desc:"4 10:10"
+    noteDuration:"8n",
+    data:[0,7,4,12,7,4,{d:0, dur:"2n"}]
   },
-  { id:"5",  name:"5 ней-ней-ней-ней", bpm:120, type:"degree",
+  { id:"5",  name:"nay", bpm:120, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[1,3,5,8,8,8,8,5,3,1], desc:"5 12:52"
+    noteDuration:"8n",
+    data:[1,3,5,8,8,8,8,5,3,{d:1, dur:"2n"}], desc:"5 12:52"
   },
-  { id:"6",  name:"6 ней-ней-ней-ней", bpm:100, type:"semitone",
+  { id:"6",  name:"nay", bpm:100, type:"semitone",
     prelude:{ enabled:true, mode:'playSecond', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"6 15:10"
+    noteDuration:"8n",
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"6 15:10"
   },
-  { id:"7",  name:"7 ма-ма-ма-ма плаксиво", bpm:100, type:"degree",
+  { id:"7",  name:"mum \\ guh \\ go \\ gee \\ koo", bpm:100, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[1,3,5,8,8,8,8,5,3,1], desc:"7 17:53"
+    data:[1,3,5,8,8,8,8,5,3,{d:1, dur:"2n"}], desc:"7 17:53"
   },
-  { id:"8",  name:"8 ма-ма-ма-ма", bpm:130, type:"semitone",
+  { id:"8",  name:"mum \\ guh \\ go \\ gee \\ koo", bpm:130, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"8 20:36"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"8 20:36"
   },
-  { id:"9",  name:"9 о-о-о-о-о-о-о-о-о", bpm:130, type:"semitone",
+  { id:"9",  name:"oo \\ oh \\ uh \\ ee \\ ah", bpm:130, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"9 23:35"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"9 23:35"
   },
-  { id:"10", name:"10 а-а-а-ааааааааа-а-а-а-а", bpm:90, type:"degree",
+  { id:"10", name:"oo \\ oh \\ uh \\ ee \\ ah", bpm:90, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[ {d:1},{d:3},{d:5},{d:8, dur:"2n"},{d:5},{d:3},{d:1} ], desc:"10 e"
+    data:[ 1,3,5,{d:8, dur:"2n"},5,3,{d:1, dur:"2n"} ], desc:"10 e"
   },
-  { id:"11", name:"11 и-и-и-и-и", bpm:110, type:"semitone",
+  { id:"11", name:"oo \\ oh \\ uh \\ ee \\ ah", bpm:110, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"11 d 32 min"
+    data:[0,7,4,12,7,4,0,7,4,12,7,4,{d:0, dur:"2n"}], desc:"11 d 32 min"
   },
-  { id:"14", name:"11 и-и-и-и-и", bpm:90, type:"semitone",
+  { id:"12", name:"wee \\ gee", bpm:110, type:"semitone",
+    noteDuration:"4n",
+    prelude:{ enabled:true, mode:'playSecond', rootMs:350, triadMs:600 },
+    data:[8,5,3,{d:1, dur:"2n"}], desc:"11 d 32 min"
+  },
+  { id:"13", name:"wee \\ gee", bpm:110, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4], desc:"у-ы"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"11 d 32 min"
   },
-  { id:"15", name:"15 у-ы закрытый рот", bpm:90, type:"semitone",
+  
+  { id:"14", name:"mm", bpm:90, type:"semitone",
+    prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
+    data:[0,12], desc:"у-ы"
+  },
+  { id:"15", name:"mm-m mm-m mm-m mm-m m", bpm:90, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
     microPause:{ every:3, ms:100 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"15 35:40"
   },
-  { id:"16", name:"16 ууу-ууу-ууу-ууу-у", bpm:90, type:"semitone",
+  { id:"16", name:"mmm mmm mmm mmm m", bpm:90, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
     microPause:{ every:3, ms:100 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"15 35:40"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"15 35:40"
   },
-  { id:"17", name:"17 хм-м-м-м закрытый рот", bpm:110, type:"semitone",
+  { id:"17", name:"mm", bpm:110, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"17 43:17"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"17 43:17"
   },
-  { id:"18", name:"18 хм-м-м-м закрытый рот длинный пик", bpm:110, type:"semitone",
+  { id:"18", name:"mm ", bpm:110, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[{d:0},{d:4},{d:7},{d:12},{d:16},{d:19, dur:"1n"},{d:17},{d:14},{d:11},{d:7},{d:5},{d:2},{d:0}], desc:"18 46:40"
+    data:[0,4,7,12,16,{d:19, dur:"1n"},17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"18 46:40"
   },
-  { id:"19", name:"19 м-м-м-м закрытый рот", bpm:110, type:"semitone",
+  { id:"19", name:"mm", bpm:110, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"19 50:46"
+    data:[0,7,4,12,7,4,0,7,4,12,7,4,{d:0, dur:"2n"}], desc:"19 50:46"
   },
-  { id:"20", name:"20 м-м-м-м-мммммааааа-а-а-а", bpm:90, type:"degree",
+  { id:"20", name:"mm oo \\ oh \\ uh \\ ee \\ ah", bpm:90, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[ {d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:5},{d:3},{d:1} ], desc:"10 e"
+    data:[1,3,5,{d:8, dur:"1n"},5,3,{d:1, dur:"2n"} ], desc:"10 e"
   },
-  { id:"21", name:"21 о-о-о вниз/вверх, длинный пик", bpm:120, type:"degree",
+  { id:"21", name:"oo \\ oh \\ uh \\ ee \\ ah", bpm:120, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[{d:8},{d:5},{d:3},{d:1},{d:3},{d:5},{d:8},{d:5},{d:3},{d:1},{d:3},{d:5},{d:8, dur:"2n"},{d:5},{d:3},{d:1}], desc:"21 56:45"
+    data:[8,5,3,1,3,5,8,5,3,1,3,5,{d:8, dur:"2n"},5,3,{d:1, dur:"2n"}], desc:"21 56:45"
   },
-  { id:"22", name:"22 а-а-а-а", bpm:120, type:"semitone",
+  { id:"22", name:"oo \\ oh \\ uh \\ ee \\ ah", bpm:120, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,7,4,12,7,4,0,7,4,12,7,4,0], desc:"22 1:01:30"
+    data:[0,7,4,12,7,4,0,7,4,12,7,4,{d:0, dur:"2n"}], desc:"22 1:01:30"
   },
-  { id:"23", name:"23 о-о-о-о-а?", bpm:80, type:"degree",
+  { id:"23", name:"oo oh \\ uh ah \\ ee ay \\ oh ah", bpm:80, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[{d:1},{d:3},{d:5},{d:8, dur:"1n"},{d:5},{d:3},{d:1}], desc:"23 1:02:32"
+    data:[1,3,5,{d:8, dur:"1n"},5,3,{d:1, dur:"2n"}], desc:"23 1:02:32"
   },
-  { id:"24", name:"24 и-и-и-иииии-ууууу-ааааа-а-а-а", bpm:90, type:"degree",
+  { id:"24", name:"oo oh ah \\ ee oo uh \\ oo (foot) uh ah", bpm:90, type:"degree",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[{d:1},{d:3},{d:5},{d:8, dur:"2n"},{d:8, dur:"2n"},{d:8, dur:"2n"},{d:5},{d:3},{d:1}], desc:"24 1:03:25"
+    data:[1,3,5,{d:8, dur:"2n"},{d:8, dur:"2n"},{d:8, dur:"2n"},5,3,{d:1, dur:"2n"}], desc:"24 1:03:25"
   },
-  { id:"25", name:"25 о-а колебания +- полтона", bpm:90, type:"semitone",
+  { id:"25", name:"oo uh \\ oo oh \\ ee ay", bpm:90, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
     data:[{d:5, dur:"2n"},{d:4, dur:"2n"},{d:3, dur:"2n"},{d:2, dur:"2n"},{d:1, dur:"2n"}], desc:"25 1:04:48"
   },
-  { id:"26", name:"26 а", bpm:120, type:"semitone",
+  { id:"26", name:"ah \\ ay \\ ee \\ oh \\ a (eat) \\ oo \\ oo (foot)", bpm:120, type:"semitone",
     prelude:{ enabled:true, mode:'root_triad', rootMs:350, triadMs:600 },
-    data:[0,4,7,12,16,19,17,14,11,7,5,2,0], desc:"26 1:05:06"
+    data:[0,4,7,12,16,19,17,14,11,7,5,2,{d:0, dur:"2n"}], desc:"26 1:05:06"
   }
 ];
 
@@ -167,21 +182,27 @@ VPT.patternLabel = function(p){
 
 /** Разворачиваем data в массив шагов с конкретной длительностью */
 VPT.expandPatternSteps = function(pattern, defaultDurStr){
+  // Новое: если у упражнения указана общая длительность,
+  // она перекрывает внешнее значение defaultDurStr из UI
+  const baseDur = pattern && pattern.noteDuration ? pattern.noteDuration : defaultDurStr;
+
   const steps = [];
-  for(const item of pattern.data){
-    if(typeof item === 'number'){
-      steps.push({ kind: pattern.type, v: item, dur: defaultDurStr });
+  for (const item of pattern.data) {
+    if (typeof item === 'number') {
+      steps.push({ kind: pattern.type, v: item, dur: baseDur });
     } else {
-      const val = (item.d ?? item.s ?? item.v);
+      const val    = (item.d ?? item.s ?? item.v);
       const repeat = Math.max(1, item.repeat || 1);
-      const dur = item.dur || defaultDurStr;
-      for(let i=0;i<repeat;i++){
+      // Персональная длительность конкретной ноты по-прежнему главнее
+      const dur = item.dur || baseDur;
+      for (let i = 0; i < repeat; i++) {
         steps.push({ kind: pattern.type, v: val, dur });
       }
     }
   }
   return steps;
 };
+
 
 /** Ступень/полутон -> абсолютный MIDI */
 VPT.toMidiFromStep = function(baseMidi, step){

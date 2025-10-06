@@ -25,12 +25,21 @@ body {
 
 /* Быстрые настройки */
 .quick-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
+  display: grid;
+  gap: 8px;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 8px;
+  background: #0f172a;
 }
+.qc-row {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.qc-label { opacity: 0.9; font-size: 0.9rem; min-width: 86px; }
+.qc-inline { display:flex; gap:6px; align-items:center; }
+.qc-grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr; }
+.qc-col { display:flex; flex-direction:column; gap:4px; }
+
 .chip-btn {
   border: 1px solid #334155;
   background: #0f172a;
@@ -46,6 +55,28 @@ body {
   border-color: #3b82f6;
 }
 
+select, input[type="number"] {
+  background: #0f172a;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+}
+
+/* ====== ПЛЕЙЛИСТЫ (аккордеон) ====== */
+.playlist-accordion { display: grid; gap: 10px; }
+.pl-section { border:1px solid #1f2937; border-radius: 12px; overflow: hidden; background:#0f172a; }
+.pl-header {
+  padding: 10px 12px;
+  font-weight: 700;
+  background: #111827;
+  cursor: pointer;
+  user-select: none;
+}
+.pl-section:not(.open) .pl-body { display: none; }
+.pl-body { padding: 8px; }
+
 /* ====== УПЛОТНЁННЫЙ СПИСОК УПРАЖНЕНИЙ ====== */
 .exercise-list {
   display: flex;
@@ -58,7 +89,7 @@ body {
 
 .exercise-item {
   display: grid;
-  grid-template-columns: 28px 1fr 65px;
+  grid-template-columns: 28px 1fr auto auto;
   align-items: center;
   gap: 6px;
   background: #111827;
@@ -86,6 +117,17 @@ body {
   text-overflow: ellipsis;
 }
 
+.exercise-item .info {
+  margin-right: 4px;
+  background: #0f172a;
+  border: 1px solid #374151;
+  color: #93c5fd;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 .exercise-item .example {
   justify-self: end;
   background: #1f2937;
@@ -100,14 +142,6 @@ body {
 .exercise-item.active {
   border-color: #3b82f6;
   background: #0f172a;
-}
-
-/* Описание */
-.exercise-desc {
-  min-height: 2em;
-  font-size: 0.9rem;
-  opacity: 0.9;
-  padding-left: 2px;
 }
 
 /* ====== НИЖНИЙ ДОК: график + панель управления ====== */
@@ -148,7 +182,7 @@ body {
   font-size: 0.9rem;
   cursor: pointer;
 }
-.transport-btn.danger { background: #6366f1; }
+.transport-btn.danger { background: #3b1f1f; }
 
 .play-btn {
   background: #22c55e;
@@ -173,7 +207,7 @@ body {
   cursor: pointer;
 }
 
-/* ====== МОДАЛКА ====== */
+/* ====== МОДАЛКИ ====== */
 .modal {
   position: fixed;
   inset: 0;
@@ -191,7 +225,7 @@ body {
   background: #1e293b;
   padding: 16px;
   border-radius: 10px;
-  width: min(400px, 92vw);
+  width: min(480px, 92vw);
 }
 
 .label {
@@ -216,7 +250,12 @@ body {
   text-align: right;
 }
 
-/* body-lock при модалке */
+.desc-text {
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* body-lock при модалках */
 body.modal-open { overflow: hidden; }
 body.modal-open .bottom-dock {
   pointer-events: none;
@@ -227,6 +266,8 @@ body.modal-open .bottom-dock {
 @media (min-width: 980px) {
   .exercise-list { max-height: 40vh; }
 }
-@media (max-width: 480px) {
-  .bottom-dock .graph-wrap svg { height: 200px; }
+@media (max-width: 560px) {
+  .qc-grid { grid-template-columns: 1fr; }
+  .playlist-accordion .pl-body { padding: 6px; }
+  .exercise-item { grid-template-columns: 28px 1fr auto auto; }
 }

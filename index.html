@@ -22,18 +22,76 @@
     </div>
 
     <!-- Быстрые настройки -->
-    <div class="quick-controls" aria-label="Быстрые настройки темпа">
-      <span>Скорость:</span>
-      <button class="chip-btn" id="btnSpeed08">0.8×</button>
-      <button class="chip-btn active" id="btnSpeed10">1.0×</button>
-      <button class="chip-btn" id="btnSpeed12">1.2×</button>
-    </div>
+    <section class="quick-controls" aria-label="Быстрые настройки">
+      <div class="qc-row">
+        <span class="qc-label">Скорость:</span>
+        <button class="chip-btn" id="btnSpeed08">0.8×</button>
+        <button class="chip-btn active" id="btnSpeed10">1.0×</button>
+        <button class="chip-btn" id="btnSpeed12">1.2×</button>
+      </div>
 
-    <!-- Список упражнений -->
-    <section class="exercise-list" id="exerciseList"></section>
+      <div class="qc-row">
+        <span class="qc-label">Режим:</span>
+        <select id="qcRunMode">
+          <option value="single">От стартовой ноты</option>
+          <option value="range" selected>В пределах диапазона</option>
+        </select>
+      </div>
 
-    <!-- Описание -->
-    <section class="exercise-desc" id="exerciseDesc">—</section>
+      <!-- Блок для режима "single" -->
+      <div class="qc-row" id="qcSingleWrap">
+        <span class="qc-label">Стартовая:</span>
+        <div class="qc-inline">
+          <button class="chip-btn" id="btnNoteDown" title="- полтона">–</button>
+          <select id="qcStartNote"></select>
+          <button class="chip-btn" id="btnNoteUp" title="+ полтона">+</button>
+        </div>
+      </div>
+
+      <!-- Блок для режима "range" -->
+      <div class="qc-grid" id="qcRangeWrap">
+        <div class="qc-col">
+          <span class="qc-label">Min:</span>
+          <select id="qcLowerNote"></select>
+        </div>
+        <div class="qc-col">
+          <span class="qc-label">Max:</span>
+          <select id="qcUpperNote"></select>
+        </div>
+        <div class="qc-col">
+          <span class="qc-label">Направление:</span>
+          <select id="qcDirection">
+            <option value="up">Вверх</option>
+            <option value="down">Вниз</option>
+            <option value="updown" selected>Вверх и вниз</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Плейлисты (аккордеон) -->
+    <section class="playlist-accordion" id="playlistAccordion">
+      <div class="pl-section open" data-id="pl1">
+        <div class="pl-header">1. Обретение уверенности</div>
+        <div class="pl-body">
+          <div class="exercise-list" id="exerciseList_pl1"></div>
+        </div>
+      </div>
+
+      <div class="pl-section" data-id="pl2">
+        <div class="pl-header">2. Пение в речевой позиции</div>
+        <div class="pl-body">
+          <div class="exercise-list" id="exerciseList_pl2"></div>
+        </div>
+      </div>
+
+      <div class="pl-section" data-id="pl3">
+        <div class="pl-header">3. Закрепление приобретённых навыков</div>
+        <div class="pl-body">
+          <div class="exercise-list" id="exerciseList_pl3"></div>
+        </div>
+      </div>
+    </section>
 
     <!-- Нижний док: график + панель управления -->
     <footer class="bottom-dock">
@@ -50,37 +108,21 @@
     </footer>
   </div>
 
-  <!-- Модалка настроек -->
+  <!-- Модалка описания упражнения -->
+  <div class="modal hidden" id="descModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="descTitle">
+      <h2 id="descTitle">Описание</h2>
+      <div id="descText" class="desc-text">—</div>
+      <div class="modal-actions">
+        <button id="btnCloseDesc" class="btn">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка настроек (оставили для расширенных параметров) -->
   <div class="modal hidden" id="settingsModal" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <h2 id="settingsTitle">Настройки</h2>
-
-      <label class="label">Режим
-        <select id="runMode">
-          <option value="single">От стартовой (1 повтор)</option>
-          <option value="range" selected>В пределах диапазона</option>
-        </select>
-      </label>
-
-      <label class="label">Направление (для диапазона)
-        <select id="direction">
-          <option value="up" selected>Только вверх</option>
-          <option value="down">Только вниз</option>
-          <option value="updown">Вверх и вниз</option>
-        </select>
-      </label>
-
-      <label class="label">Стартовая нота (для режима «От стартовой»)
-        <select id="startNote"></select>
-      </label>
-
-      <label class="label">Нижняя нота (min)
-        <select id="lowerNote"></select>
-      </label>
-
-      <label class="label">Верхняя нота (max)
-        <select id="upperNote"></select>
-      </label>
+      <h2 id="settingsTitle">Расширенные настройки</h2>
 
       <label class="label">Длительность (по умолчанию)
         <select id="noteDur">
@@ -108,7 +150,7 @@
       </label>
 
       <label class="label">Пауза на вдох между повторами (мс)
-        <input id="breathMs" type="number" min="0" max="8000" value="800"/>
+        <input id="breathMs" type="number" min="0" max="8000" value="0"/>
       </label>
 
       <div class="modal-actions">

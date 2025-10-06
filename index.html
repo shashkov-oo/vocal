@@ -21,51 +21,59 @@
       <span id="liveNote">…</span>
     </div>
 
-    <!-- Быстрые настройки -->
-    <section class="quick-controls" aria-label="Быстрые настройки">
-      <div class="qc-row">
-        <span class="qc-label">Скорость:</span>
-        <button class="chip-btn" id="btnSpeed08">0.8×</button>
-        <button class="chip-btn active" id="btnSpeed10">1.0×</button>
-        <button class="chip-btn" id="btnSpeed12">1.2×</button>
-      </div>
+    <!-- Быстрые настройки (сворачиваемые) -->
+    <section id="quickWrap" class="quick-wrap">
+      <button id="qcToggle" class="qc-toggle" aria-expanded="true" title="Свернуть/развернуть быстрые настройки">
+        ---быстрые настройки---
+      </button>
 
-      <div class="qc-row">
-        <span class="qc-label">Режим:</span>
-        <select id="qcRunMode">
-          <option value="single">От стартовой ноты</option>
-          <option value="range" selected>В пределах диапазона</option>
-        </select>
-      </div>
+      <div id="quickContent" class="quick-content">
+        <section class="quick-controls" aria-label="Быстрые настройки">
+          <div class="qc-row">
+            <span class="qc-label">Скорость:</span>
+            <button class="chip-btn" id="btnSpeed08">0.8×</button>
+            <button class="chip-btn active" id="btnSpeed10">1.0×</button>
+            <button class="chip-btn" id="btnSpeed12">1.2×</button>
+          </div>
 
-      <!-- Блок для режима "single" -->
-      <div class="qc-row" id="qcSingleWrap">
-        <span class="qc-label">Стартовая:</span>
-        <div class="qc-inline">
-          <button class="chip-btn" id="btnNoteDown" title="- полтона">–</button>
-          <select id="qcStartNote"></select>
-          <button class="chip-btn" id="btnNoteUp" title="+ полтона">+</button>
-        </div>
-      </div>
+          <div class="qc-row">
+            <span class="qc-label">Режим:</span>
+            <select id="qcRunMode">
+              <option value="single">От стартовой ноты</option>
+              <option value="range" selected>В пределах диапазона</option>
+            </select>
+          </div>
 
-      <!-- Блок для режима "range" -->
-      <div class="qc-grid" id="qcRangeWrap">
-        <div class="qc-col">
-          <span class="qc-label">Min:</span>
-          <select id="qcLowerNote"></select>
-        </div>
-        <div class="qc-col">
-          <span class="qc-label">Max:</span>
-          <select id="qcUpperNote"></select>
-        </div>
-        <div class="qc-col">
-          <span class="qc-label">Направление:</span>
-          <select id="qcDirection">
-            <option value="up">Вверх</option>
-            <option value="down">Вниз</option>
-            <option value="updown" selected>Вверх и вниз</option>
-          </select>
-        </div>
+          <!-- Блок для режима "single" -->
+          <div class="qc-row" id="qcSingleWrap">
+            <span class="qc-label">Стартовая:</span>
+            <div class="qc-inline">
+              <button class="chip-btn" id="btnNoteDown" title="- полтона">–</button>
+              <select id="qcStartNote"></select>
+              <button class="chip-btn" id="btnNoteUp" title="+ полтона">+</button>
+            </div>
+          </div>
+
+          <!-- Блок для режима "range" -->
+          <div class="qc-grid" id="qcRangeWrap">
+            <div class="qc-col">
+              <span class="qc-label">Min:</span>
+              <select id="qcLowerNote"></select>
+            </div>
+            <div class="qc-col">
+              <span class="qc-label">Max:</span>
+              <select id="qcUpperNote"></select>
+            </div>
+            <div class="qc-col">
+              <span class="qc-label">Направление:</span>
+              <select id="qcDirection">
+                <option value="up">Вверх</option>
+                <option value="down">Вниз</option>
+                <option value="updown" selected>Вверх и вниз</option>
+              </select>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -119,7 +127,7 @@
     </div>
   </div>
 
-  <!-- Модалка настроек (оставили для расширенных параметров) -->
+  <!-- Модалка расширенных настроек -->
   <div class="modal hidden" id="settingsModal" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <h2 id="settingsTitle">Расширенные настройки</h2>

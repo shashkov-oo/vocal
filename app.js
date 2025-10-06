@@ -1,4 +1,4 @@
-// app.js — быстрые настройки (режимы на главной), аккордеон плейлистов, инфо-модалка, старт/пауза/стоп, скорость ×0.8/1.0/1.2, метры из паттернов
+// app.js — сворачивание быстрых настроек в «линию из дефисов», сохранение состояния, всё остальное как прежде
 (function () {
   const els = {
     svg: document.getElementById("svg"),
@@ -8,6 +8,11 @@
     btnPlayPause: document.getElementById("btnPlayPause"),
     btnStop: document.getElementById("btnStop"),
     btnNext: document.getElementById("btnNext"),
+
+    // Кнопка-«разделительная черта» и обёртка быстрых настроек
+    quickWrap: document.getElementById("quickWrap"),
+    qcToggle: document.getElementById("qcToggle"),
+    quickContent: document.getElementById("quickContent"),
 
     // Быстрые скорости
     btnSpeed08: document.getElementById("btnSpeed08"),
@@ -51,8 +56,8 @@
 
   const DEFAULT_NOTE_DURATION = "8n";
 
-  let currentIndex = 0;      // индекс внутри общего массива VPT.PATTERNS
-  let currentGroup = "pl1";  // открытая секция плейлиста
+  let currentIndex = 0;
+  let currentGroup = "pl1";
   let isPlaying = false;
   let isPaused = false;
   let speedMul = 1.0;
@@ -60,7 +65,7 @@
   let lastMidis = [];
   let lastBeats = [];
 
-  // Безопасные заглушки
+  // Заглушки
   window.VPT = window.VPT || {};
   if (!VPT.examples) {
     VPT.examples = {
@@ -87,9 +92,7 @@
     const midi = VPT.noteToMidiSafe(sel.value || "A2");
     const next = midi + delta;
     sel.value = VPT.midiToNote(next);
-    // выровнять на ближайшее присутствующее значение в списке
     if (![...sel.options].some(o => o.value === sel.value)) {
-      // если нет точного — подберём соседний
       const opts = [...sel.options].map(o=>VPT.noteToMidiSafe(o.value));
       let closest = opts[0], minDiff = Math.abs(opts[0]-next);
       for (const m of opts) {
@@ -99,12 +102,28 @@
     }
   }
 
+  // ---------- Сворачивание быстрых настроек ----------
+  const LS_KEY_QC = "vpt_qc_collapsed";
+  function applyQcCollapsed(flag){
+    els.quickWrap.classList.toggle("collapsed", !!flag);
+    els.qcToggle.setAttribute("aria-expanded", flag ? "false" : "true");
+  }
+  function loadQcCollapsed(){
+    try { return localStorage.getItem(LS_KEY_QC) === "1"; } catch { return false; }
+  }
+  function saveQcCollapsed(flag){
+    try { localStorage.setItem(LS_KEY_QC, flag ? "1":"0"); } catch {}
+  }
+  function toggleQc(){
+    const willCollapse = !els.quickWrap.classList.contains("collapsed");
+    applyQcCollapsed(willCollapse);
+    saveQcCollapsed(willCollapse);
+  }
+
   // ---------- Группы плейлистов ----------
   function inRange(id, a,b){ const x = parseInt(id,10); return Number.isFinite(x) && x>=a && x<=b; }
   function buildGroups() {
-    const pl1 = []; // 1–13
-    const pl2 = []; // 15–26
-    const pl3 = []; // 27–30
+    const pl1 = []; const pl2 = []; const pl3 = [];
     (VPT.PATTERNS || []).forEach((p, idx) => {
       if (inRange(p.id, 1, 13)) pl1.push({p, idx});
       else if (inRange(p.id, 15, 26)) pl2.push({p, idx});
@@ -183,9 +202,7 @@
       h.addEventListener("click", () => {
         const sec = h.parentElement;
         const id = sec.getAttribute("data-id");
-        // закрыть все
         els.playlistAccordion.querySelectorAll(".pl-section").forEach(s => s.classList.remove("open"));
-        // открыть выбранный
         sec.classList.add("open");
         currentGroup = id;
       });
@@ -193,15 +210,13 @@
   }
 
   function highlightActive() {
-    const allLists = [els.exerciseList_pl1, els.exerciseList_pl2, els.exerciseList_pl3];
-    allLists.forEach(list => {
+    [els.exerciseList_pl1, els.exerciseList_pl2, els.exerciseList_pl3].forEach(list => {
       list.querySelectorAll(".exercise-item").forEach((row) => row.classList.remove("active"));
     });
     const pat = patternByIndex(currentIndex)?.obj;
     if (!pat) return;
     const id = String(pat.id);
-    const containers = [els.exerciseList_pl1, els.exerciseList_pl2, els.exerciseList_pl3];
-    containers.forEach(c => {
+    [els.exerciseList_pl1, els.exerciseList_pl2, els.exerciseList_pl3].forEach(c => {
       if (!c) return;
       const row = [...c.querySelectorAll(".exercise-item")].find(r => r.dataset.id === id);
       if (row) row.classList.add("active");
@@ -297,7 +312,6 @@
   function selectIndex(i) {
     if (isPlaying || isPaused) stop();
     VPT.examples.stop();
-    // вернуть текст "пример" всем кнопкам
     document.querySelectorAll(".example").forEach(btn => btn.textContent = "▶ пример");
 
     const res = patternByIndex(i);
@@ -305,8 +319,6 @@
 
     currentIndex = res.idx;
     highlightActive();
-
-    // предпросмотр: строим шаги по текущим квик-настройкам
     previewWithCurrentSettings();
   }
 
@@ -314,8 +326,8 @@
     const pat = patternByIndex(currentIndex)?.obj;
     if (!pat) return;
 
-    const mode = els.qcRunMode.value;             // 'single' | 'range'
-    const dir  = els.qcDirection.value;           // 'up' | 'down' | 'updown'
+    const mode = els.qcRunMode.value;
+    const dir  = els.qcDirection.value;
     const defaultDur = els.noteDur.value || DEFAULT_NOTE_DURATION;
 
     const startMidi  = VPT.noteToMidiSafe(els.qcStartNote.value || "A2");
@@ -354,7 +366,6 @@
     const pat = patternByIndex(currentIndex)?.obj;
     if (!pat) return;
 
-    // стопаем другие источники
     VPT.examples.stop();
     document.querySelectorAll(".example").forEach(btn => btn.textContent = "▶ пример");
 
@@ -366,8 +377,8 @@
     applyTransportBpmAndMeter(pat);
     clearSchedulesAndStop();
 
-    const mode       = els.qcRunMode.value;          // 'single' | 'range'
-    const direction  = els.qcDirection.value;        // 'up' | 'down' | 'updown'
+    const mode       = els.qcRunMode.value;
+    const direction  = els.qcDirection.value;
     const defaultDur = els.noteDur.value || DEFAULT_NOTE_DURATION;
 
     const startMidi  = VPT.noteToMidiSafe(els.qcStartNote.value || "A2");
@@ -375,7 +386,6 @@
     const upper      = VPT.noteToMidiSafe(els.qcUpperNote.value || "A4");
     const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "0", 10) || 0) / 1000);
 
-    // прелюдия (из паттерна + overrides из «Расширенных», если нужно)
     const prePat = pat.prelude || {};
     const preludeEnabled = !!(els.playPrelude?.checked ?? prePat.enabled);
     const preludeMode    = prePat.mode || 'root_triad';
@@ -384,13 +394,8 @@
 
     const schedulePrelude = (whenSec, rootMidi, velocity=0.8)=>{
       const s = VPT.audio.get(); const N = (m)=>VPT.midiToNote(m);
-      const playNote = (m, dur, t0)=> {
-        Tone.Transport.schedule((t)=>{ try{ s.triggerAttackRelease(N(m), dur, t, velocity); }catch(_){} }, `+${t0}`); return t0 + dur;
-      };
-      const playTriad = (m12, dur, t0)=> {
-        const triad = [m12, m12+4, m12+7];
-        Tone.Transport.schedule((t)=>{ try{ triad.forEach(n=>s.triggerAttackRelease(N(n), dur, t, velocity*0.95)); }catch(_){} }, `+${t0}`); return t0 + dur;
-      };
+      const playNote = (m, dur, t0)=> { Tone.Transport.schedule((t)=>{ try{ s.triggerAttackRelease(N(m), dur, t, velocity); }catch(_){} }, `+${t0}`); return t0 + dur; };
+      const playTriad = (m12, dur, t0)=> { const triad = [m12, m12+4, m12+7]; Tone.Transport.schedule((t)=>{ try{ triad.forEach(n=>s.triggerAttackRelease(N(n), dur, t, velocity*0.95)); }catch(_){} }, `+${t0}`); return t0 + dur; };
       let t = whenSec;
       if (preludeMode === 'dom5_tonic_triad') { t = playNote(rootMidi+19, preRootSec, t); t = playNote(rootMidi+12, preRootSec, t); t = playTriad(rootMidi+12, preTriadSec, t); }
       else { t = playNote(rootMidi, preRootSec, t); t = playTriad(rootMidi, preTriadSec, t); }
@@ -419,7 +424,7 @@
       return;
     }
 
-    // режим диапазона
+    // диапазон
     const maxOff = VPT.patternMaxOffsetSemitones(pat);
     const rootsAsc = [];
     for (let r = lower; r + maxOff <= upper; r += 1) rootsAsc.push(r);
@@ -502,7 +507,7 @@
   // ---------- UI state ----------
   function setPlayUiStatePlaying(){
     els.btnPlayPause.textContent = "⏸";
-    els.btnPlayPause.classList.remove("paused");
+    els.btnPlayPause.classList.remove("playing"); // на всякий
     els.btnPlayPause.classList.add("playing");
     isPlaying = true;
     isPaused = false;
@@ -534,10 +539,13 @@
   fillNoteSelect(els.qcUpperNote, "A4");
   applyModeVisibility();
 
+  // восстановить состояние свёртки быстрых настроек
+  applyQcCollapsed(loadQcCollapsed());
+  els.qcToggle.addEventListener("click", toggleQc);
+
   renderPlaylists();
   setAccordionHandlers();
 
-  // Выберем первое упражнение из первой группы по умолчанию (id 1–13)
   const firstIdx = (VPT.PATTERNS || []).findIndex(p => inRange(p.id,1,13));
   selectIndex(firstIdx >= 0 ? firstIdx : 0);
 

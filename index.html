@@ -15,10 +15,18 @@
       <button id="btnSettings" class="icon-btn" aria-label="Настройки">⚙</button>
     </header>
 
-    <!-- Питч-панель (новая) -->
+    <!-- Питч-панель -->
     <div id="pitchPanel" class="pitch-panel" style="display:flex;gap:8px;align-items:center;">
       <button id="btnPitch" class="btn">🎤 Включить питч-трекер</button>
       <span id="liveNote">…</span>
+    </div>
+
+    <!-- Быстрые настройки -->
+    <div class="quick-controls" aria-label="Быстрые настройки темпа">
+      <span>Скорость:</span>
+      <button class="chip-btn" id="btnSpeed08">0.8×</button>
+      <button class="chip-btn active" id="btnSpeed10">1.0×</button>
+      <button class="chip-btn" id="btnSpeed12">1.2×</button>
     </div>
 
     <!-- Список упражнений -->
@@ -35,7 +43,8 @@
 
       <div class="bottom-bar">
         <button id="btnPrev" class="transport-btn" aria-label="Предыдущее">⏮</button>
-        <button id="btnPlayStop" class="play-btn" aria-label="Играть">▶️</button>
+        <button id="btnPlayPause" class="play-btn" aria-label="Играть/Пауза">▶️</button>
+        <button id="btnStop" class="transport-btn danger" aria-label="Стоп">⏹</button>
         <button id="btnNext" class="transport-btn" aria-label="Следующее">⏭</button>
       </div>
     </footer>
@@ -50,6 +59,14 @@
         <select id="runMode">
           <option value="single">От стартовой (1 повтор)</option>
           <option value="range" selected>В пределах диапазона</option>
+        </select>
+      </label>
+
+      <label class="label">Направление (для диапазона)
+        <select id="direction">
+          <option value="up" selected>Только вверх</option>
+          <option value="down">Только вниз</option>
+          <option value="updown">Вверх и вниз</option>
         </select>
       </label>
 
@@ -81,19 +98,15 @@
         <input id="playPrelude" type="checkbox" checked />
         Прелюдия перед началом / каждым блоком: стартовая нота → мажорное трезвучие
       </label>
-      
+
       <label class="label">Длительность стартовой ноты (мс)
         <input id="preludeRootMs" type="number" min="100" max="3000" value="350"/>
       </label>
-      
+
       <label class="label">Длительность трезвучия (мс)
         <input id="triadMs" type="number" min="100" max="3000" value="600"/>
       </label>
-      
-      <label class="label">Пауза на вдох между повторами (мс)
-        <input id="breathMs" type="number" min="0" max="8000" value="100"/>
-      </label>
-      
+
       <label class="label">Пауза на вдох между повторами (мс)
         <input id="breathMs" type="number" min="0" max="8000" value="800"/>
       </label>
@@ -106,13 +119,12 @@
 
   <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
-  
+
   <script src="./patterns.js"></script>
   <script src="./graph.js"></script>
   <script src="./audio.js"></script>
   <script src="./app.js"></script>
   <script src="./pitch.js"></script>
-  
 
   <script>
     if ('serviceWorker' in navigator) {

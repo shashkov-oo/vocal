@@ -1,4 +1,4 @@
-// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание + прелюдии + микропаузи
+// app.js — список-треки, описание, график, нижний транспорт + примеры + дыхание + прелюдии + микропаузи + метр + направления + быстрый темп
 (function () {
   const els = {
     exerciseList: document.getElementById("exerciseList"),
@@ -6,8 +6,14 @@
     svg: document.getElementById("svg"),
 
     btnPrev: document.getElementById("btnPrev"),
-    btnPlayStop: document.getElementById("btnPlayStop"),
+    btnPlayPause: document.getElementById("btnPlayPause"),
+    btnStop: document.getElementById("btnStop"),
     btnNext: document.getElementById("btnNext"),
+
+    // quick speed
+    btnSpeed08: document.getElementById("btnSpeed08"),
+    btnSpeed10: document.getElementById("btnSpeed10"),
+    btnSpeed12: document.getElementById("btnSpeed12"),
 
     // settings modal
     btnSettings: document.getElementById("btnSettings"),
@@ -16,6 +22,7 @@
 
     // controls
     runMode: document.getElementById("runMode"),      // 'single' | 'range'
+    direction: document.getElementById("direction"),  // 'up' | 'down' | 'updown'
     startNote: document.getElementById("startNote"),
     lowerNote: document.getElementById("lowerNote"),
     upperNote: document.getElementById("upperNote"),
@@ -23,26 +30,12 @@
     breathMs: document.getElementById("breathMs"),
   };
 
-  const DEFAULT_NOTE_DURATION = "8n"; // что было по умолчанию раньше
-
-  function resolveNoteDuration(pattern, step) {
-    // 1) приоритет у локальной длительности ноты
-    if (step && typeof step === "object" && step.dur) return step.dur;
-  
-    // 2) глобальная длительность всего упражнения (музыкальная)
-    if (pattern && pattern.noteDuration) return pattern.noteDuration;
-  
-    // 3) глобальная длительность в миллисекундах
-    if (pattern && typeof pattern.noteDurationMs === "number") {
-      return pattern.noteDurationMs / 1000; // Tone.js понимает число как секунды
-    }
-  
-    // 4) дефолт
-    return DEFAULT_NOTE_DURATION;
-  }
+  const DEFAULT_NOTE_DURATION = "8n";
 
   let currentIndex = 0;
-  let isPlaying = false;
+  let isPlaying = false; // идёт воспроизведение (Transport.started)
+  let isPaused = false;  // стоит на паузе (Transport.paused)
+  let speedMul = 1.0;    // множитель BPM (0.8 / 1.0 / 1.2)
 
   // для перерисовки графика мгновенно при смещении guide
   let lastMidis = [];
@@ -106,7 +99,7 @@
           example.textContent = "▶ пример";
           return;
         }
-        if (isPlaying) stop();
+        if (isPlaying || isPaused) stop();
         VPT.examples.stop();
         [...els.exerciseList.querySelectorAll(".example")].forEach(btn => {
           if (btn !== example) btn.textContent = "▶ пример";
@@ -148,7 +141,6 @@
   }
 
   // Вставляет "тихие" шаги-паузы после каждой N-й звучащей ноты.
-  // rest-шага нет звука, но он двигает таймлайн и график по X.
   function injectMicroPauses(steps, rule, bpm) {
     if (!rule || !rule.every || !rule.ms) return steps;
     const every = Math.max(1, rule.every|0);
@@ -162,12 +154,11 @@
       out.push(st);
       countNotes++;
 
-      // если это каждая N-я нота — вставим микропаузу (rest)
       if (countNotes % every === 0 && gapSec > 0) {
         out.push({
-          midi: st.midi,           // для графика — горизонтальный отрезок
-          durStr: null,            // не используем VPT.durToSeconds
-          durSec: gapSec,          // работаем напрямую в секундах
+          midi: st.midi,
+          durStr: null,
+          durSec: gapSec,
           beats: gapSec / secPerBeat,
           rest: true
         });
@@ -177,8 +168,7 @@
   }
 
   function selectIndex(i) {
-    // стопаем всё при переключении
-    if (isPlaying) stop();
+    if (isPlaying || isPaused) stop(); // полная остановка при переключении
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
 
@@ -196,7 +186,6 @@
 
     drawFromSteps(steps);
     if (steps.length) {
-      // ставим guide на первую звучащую ноту (rest-шаги пропускаем)
       const firstSound = steps.find(s => !s.rest) || steps[0];
       VPT.setGuideNote(firstSound.midi);
       VPT.drawGraph(lastMidis, lastBeats);
@@ -206,7 +195,6 @@
   function updatePreview() { selectIndex(currentIndex); }
 
   // ---- прелюдия: варианты входа перед блоком ----
-  // mode: 'root_triad' | 'dom5_tonic_triad'
   function schedulePrelude(whenSec, rootMidi, rootSec, triadSec, mode='root_triad', velocity=0.8) {
     const s = VPT.audio.get();
     const N = (m)=>VPT.midiToNote(m);
@@ -223,20 +211,39 @@
 
     let t = whenSec;
     if (mode === 'dom5_tonic_triad') {
-      // +19 → +12 → (12,16,19)
       t = playNote(rootMidi+19, rootSec, t);
       t = playNote(rootMidi+12, rootSec, t);
       t = playTriad(rootMidi+12, triadSec, t);
     } else {
-      // стартовая нота → трезвучие от корня
       t = playNote(rootMidi, rootSec, t);
       t = playTriad(rootMidi, triadSec, t);
     }
-    return t; // вернуть новое "when"
+    return t;
   }
 
-  // ---------- транспорт ----------
-  async function play() {
+  function parseMeter(pat){
+    const m = pat && pat.meter ? String(pat.meter) : (VPT.DEFAULT_METER || "3/4");
+    const [num, den] = m.split('/').map(v=>parseInt(v,10));
+    const valid = Number.isFinite(num) && Number.isFinite(den) && num>0 && den>0;
+    return valid ? [num,den] : [3,4];
+  }
+
+  function applyTransportBpmAndMeter(pat){
+    const bpm = parseInt(pat?.bpm || 90, 10);
+    Tone.Transport.bpm.value = Math.max(20, Math.min(300, bpm * speedMul));
+    const [num,den] = parseMeter(pat);
+    Tone.Transport.timeSignature = [num,den];
+  }
+
+  function clearSchedulesAndStop(){
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    try { Tone.Transport.position = 0; } catch(e){}
+    if (VPT.audio.get() && VPT.audio.get().releaseAll) { try { VPT.audio.get().releaseAll(); } catch(e){} }
+  }
+
+  // ---------- воспроизведение ----------
+  async function startFreshScheduleAndPlay() {
     const patObj = patternByIndex(currentIndex)?.obj;
     if (!patObj) return;
 
@@ -244,25 +251,20 @@
     VPT.examples.stop();
     [...els.exerciseList.querySelectorAll(".example")].forEach(btn => btn.textContent = "▶ пример");
 
-    els.btnPlayStop.textContent = "⏹";
-    els.btnPlayStop.classList.add("stop");
-    isPlaying = true;
-
     try {
       await VPT.audio.ensure();
       await Tone.start();
     } catch(e) { console.error("Audio load error", e); }
 
-    // Темп берём из упражнения (fallback 90)
-    Tone.Transport.bpm.value = parseInt(patObj.bpm || 90, 10);
-    VPT.audio.stop();
+    applyTransportBpmAndMeter(patObj);
+    clearSchedulesAndStop();
 
     const mode       = els.runMode.value;          // 'single' | 'range'
+    const direction  = els.direction.value;        // 'up' | 'down' | 'updown'
     const defaultDur = els.noteDur.value;
     const startMidi  = VPT.noteToMidiSafe(els.startNote.value || "A2");
     const lower      = VPT.noteToMidiSafe(els.lowerNote.value || "A2");
     const upper      = VPT.noteToMidiSafe(els.upperNote.value || "A4");
-    //const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "800", 10) || 0) / 1000);
     const breathSec  = Math.max(0, (parseInt(els.breathMs.value || "0", 10) || 0) / 1000);
 
     // параметры прелюдии из упражнения
@@ -278,16 +280,12 @@
       drawFromSteps(steps);
 
       let when = 0;
-
-      // прелюдия: перед началом
       if (preludeEnabled) {
         when = schedulePrelude(when, startMidi, preRootSec, preTriadSec, preludeMode);
       }
 
       for (const st of steps) {
         const dur = (st.durSec != null) ? st.durSec : VPT.durToSeconds(st.durStr);
-
-        // guide и звук — только для звучащих шагов
         if (!st.rest) {
           Tone.Transport.schedule(() => {
             VPT.setGuideNote(st.midi);
@@ -298,20 +296,27 @@
             VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
           }, `+${when}`);
         }
-
         when += dur;
       }
 
       Tone.Transport.scheduleOnce(() => stop(), `+${when + 0.08}`);
       Tone.Transport.start();
+      setPlayUiStatePlaying();
       return;
     }
 
-    // режим "диапазон": шаг в 1 полутон, с паузами на вдох между блоками
+    // режим "диапазон": шаг в 1 полутон
     const maxOff = VPT.patternMaxOffsetSemitones(patObj);
-    const roots = [];
-    for (let r = lower; r + maxOff <= upper; r += 1) roots.push(r);
-    if (!roots.length) roots.push(Math.max(lower, upper - maxOff));
+    const rootsAsc = [];
+    for (let r = lower; r + maxOff <= upper; r += 1) rootsAsc.push(r);
+    if (!rootsAsc.length) rootsAsc.push(Math.max(lower, upper - maxOff));
+
+    let roots = rootsAsc.slice();
+    if (direction === 'down') roots = rootsAsc.slice().reverse();
+    if (direction === 'updown') {
+      const down = rootsAsc.slice(0, -1).reverse(); // без повтора вершины
+      roots = rootsAsc.concat(down);
+    }
 
     let when = 0;
     for (let idx = 0; idx < roots.length; idx++) {
@@ -319,12 +324,10 @@
       const baseSteps = VPT.buildStepsForRoot(root, defaultDur, patObj);
       const steps = injectMicroPauses(baseSteps, patObj.microPause, patObj.bpm);
 
-      // прелюдия перед блоком
       if (preludeEnabled) {
         when = schedulePrelude(when, root, preRootSec, preTriadSec, preludeMode);
       }
 
-      // перерисовываем график под новый блок
       Tone.Transport.schedule(() => { 
         drawFromSteps(steps);
         if (steps.length) {
@@ -336,8 +339,6 @@
 
       for (const st of steps) {
         const dur = (st.durSec != null) ? st.durSec : VPT.durToSeconds(st.durStr);
-
-        // перед каждой нотой двигаем guide и играем звук, rest — тишина
         if (!st.rest) {
           Tone.Transport.schedule(() => {
             VPT.setGuideNote(st.midi);
@@ -348,11 +349,9 @@
             VPT.audio.get().triggerAttackRelease(VPT.midiToNote(st.midi), dur, t, 0.9);
           }, `+${when}`);
         }
-
         when += dur;
       }
 
-      // пауза на вдох (кроме последнего блока)
       if (breathSec > 0 && idx < roots.length - 1) {
         when += breathSec;
       }
@@ -360,19 +359,36 @@
 
     Tone.Transport.scheduleOnce(() => stop(), `+${when + 0.08}`);
     Tone.Transport.start();
+    setPlayUiStatePlaying();
   }
 
-  function stop() {
-    VPT.audio.stop();
-    els.btnPlayStop.textContent = "▶️";
-    els.btnPlayStop.classList.remove("stop");
+  function pausePlayback(){
+    if (!isPlaying) return;
+    Tone.Transport.pause();
+    isPaused = true;
     isPlaying = false;
+    setPlayUiStatePaused();
+  }
+
+  function resumePlayback(){
+    if (!isPaused) return;
+    Tone.Transport.start(); // продолжить с текущей позиции
+    isPaused = false;
+    isPlaying = true;
+    setPlayUiStatePlaying();
+  }
+
+  function stop(){
+    clearSchedulesAndStop();
+    isPlaying = false;
+    isPaused = false;
+    setPlayUiStateStopped();
   }
 
   function next() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    if (isPlaying) stop();
+    if (isPlaying || isPaused) stop();
     VPT.examples.stop();
     selectIndex((currentIndex + 1) % total);
   }
@@ -380,9 +396,33 @@
   function prev() {
     const total = (VPT.PATTERNS || []).length;
     if (!total) return;
-    if (isPlaying) stop();
+    if (isPlaying || isPaused) stop();
     VPT.examples.stop();
     selectIndex((currentIndex - 1 + total) % total);
+  }
+
+  // ---------- UI state ----------
+  function setPlayUiStatePlaying(){
+    els.btnPlayPause.textContent = "⏸";
+    els.btnPlayPause.classList.remove("paused");
+    els.btnPlayPause.classList.add("playing");
+    isPlaying = true;
+    isPaused = false;
+  }
+  function setPlayUiStatePaused(){
+    els.btnPlayPause.textContent = "▶️";
+    els.btnPlayPause.classList.remove("playing");
+    els.btnPlayPause.classList.add("paused");
+  }
+  function setPlayUiStateStopped(){
+    els.btnPlayPause.textContent = "▶️";
+    els.btnPlayPause.classList.remove("playing");
+    els.btnPlayPause.classList.add("paused");
+  }
+
+  function setSpeedUi(activeId){
+    [els.btnSpeed08, els.btnSpeed10, els.btnSpeed12].forEach(b=>b.classList.remove("active"));
+    if (activeId) document.getElementById(activeId).classList.add("active");
   }
 
   // ---------- init ----------
@@ -392,9 +432,32 @@
   renderExerciseList();
   selectIndex(0);
 
-  els.btnPlayStop.addEventListener("click", () => (isPlaying ? stop() : play()));
+  // Транспорт
+  els.btnPlayPause.addEventListener("click", () => {
+    if (isPlaying) { pausePlayback(); return; }
+    if (isPaused)  { resumePlayback(); return; }
+    startFreshScheduleAndPlay();
+  });
+  els.btnStop.addEventListener("click", stop);
   els.btnNext.addEventListener("click", next);
   els.btnPrev.addEventListener("click", prev);
+
+  // Быстрая скорость
+  els.btnSpeed08.addEventListener("click", () => {
+    speedMul = 0.8; setSpeedUi("btnSpeed08");
+    const pat = patternByIndex(currentIndex)?.obj;
+    if (pat) Tone.Transport.bpm.value = (parseInt(pat.bpm||90,10))*speedMul;
+  });
+  els.btnSpeed10.addEventListener("click", () => {
+    speedMul = 1.0; setSpeedUi("btnSpeed10");
+    const pat = patternByIndex(currentIndex)?.obj;
+    if (pat) Tone.Transport.bpm.value = (parseInt(pat.bpm||90,10))*speedMul;
+  });
+  els.btnSpeed12.addEventListener("click", () => {
+    speedMul = 1.2; setSpeedUi("btnSpeed12");
+    const pat = patternByIndex(currentIndex)?.obj;
+    if (pat) Tone.Transport.bpm.value = (parseInt(pat.bpm||90,10))*speedMul;
+  });
 
   // модалка
   els.btnSettings.addEventListener("click", () => {
@@ -406,7 +469,7 @@
     els.settingsModal.classList.add("hidden");
     els.settingsModal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
-    if (!isPlaying) updatePreview();
+    if (!isPlaying && !isPaused) updatePreview();
   }
   els.btnCloseSettings.addEventListener("click", closeSettingsModal);
   els.settingsModal.addEventListener("click", (e) => {
@@ -418,10 +481,10 @@
     }
   });
 
-  // обновляем предпросмотр только когда не играем
-  [els.runMode, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
-    .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying) updatePreview(); }));
+  // обновляем предпросмотр только когда не играем/не на паузе
+  [els.runMode, els.direction, els.startNote, els.lowerNote, els.upperNote, els.noteDur, els.breathMs]
+    .forEach(ctrl => ctrl.addEventListener("change", () => { if (!isPlaying && !isPaused) updatePreview(); }));
 
-  // пересчёт ширины на ресайз (поддерживаем «вмещается без скролла»)
-  window.addEventListener('resize', () => { if (!isPlaying) updatePreview(); });
+  // пересчёт ширины на ресайз
+  window.addEventListener('resize', () => { if (!isPlaying && !isPaused) updatePreview(); });
 })();
